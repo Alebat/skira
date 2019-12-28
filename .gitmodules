@@ -1,0 +1,9 @@
+[submodule "YOLOv3_TensorFlow"]
+	path = YOLOv3_TensorFlow
+	url = git@github.com:Alebat/YOLOv3_TensorFlow.git
+[submodule "iou_tracker"]
+	path = iou_tracker
+	url = git@github.com:bochinski/iou-tracker.git
+[submodule "tracking_wo_bnw"]
+	path = tracking_wo_bnw
+	url = git@github.com:phil-bergmann/tracking_wo_bnw.git

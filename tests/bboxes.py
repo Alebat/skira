@@ -1,8 +1,10 @@
+import os
 import unittest
 from argparse import Namespace
+from time import time
 
 from src.bboxes import crop, highlight
-from src.main import main
+from src.main import main, people_detection
 
 
 class MyTestCase(unittest.TestCase):
@@ -15,23 +17,73 @@ class MyTestCase(unittest.TestCase):
              False, True)
 
     def test_something2_1(self):
-        highlight('../data/vids/IMG_0819.MOV', '../data/vids/Ski-19_iou.txt', '../data/output/crop_test_0819.mov',
-                  False, True)
+        highlight('../data/vids/IMG_0886.MOV', '../data/1578220812/tracks_IMG_0886_hi_res_det.txt', '../data/1578220812/main_IMG_0886.MOV',
+                  False, False)
 
     def test_something2_2(self):
-        # highlight('../data/vids/IMG_0887.MOV', '../data/1577561725/tracks_IMG_0887.txt', '../data/1577561725/IMG_0887.MOV',
+        # highlight('../data/vids/IMG_0886.MOV', '../data/1577561725/tracks_IMG_0886.txt',
+        #           '../data/1577561725/IMG_0886.MOV',
         #           False, False)
-        crop('../data/vids/IMG_0887.MOV', '../data/1577561725/tracks_IMG_0887.txt', '../data/1577561725/IMG_0887.MOV',
+        crop('../data/vids/IMG_0886.MOV', '../data/1577561725/tracks_IMG_0886.txt', '../data/1577561725/IMG_0886.MOV',
              'mov', False, False)
 
     def test_main(self):
         main(Namespace(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
                        class_name_path='../YOLOv3_TensorFlow/data/coco.names',
-                       name='IMG_0887',
+                       name='IMG_0886',
+                       video='../data/vids/IMG_0886.MOV',
                        letterbox_resize=True,
                        new_size=[416, 416],
                        restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
                        sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2))
+
+    def test_main_hi_res(self):
+        main(Namespace(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
+                       class_name_path='../YOLOv3_TensorFlow/data/coco.names',
+                       name='IMG_0886_hi_res_det',
+                       video='../data/vids/IMG_0886.MOV',
+                       letterbox_resize=True,
+                       new_size=[832, 416],
+                       restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
+                       sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2))
+
+    def test_detection(self):
+        time_id = int(time())
+        os.makedirs(f'../data/{time_id}_det', exist_ok=False)
+
+        people_detection(Namespace(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
+                                   class_name_path='../YOLOv3_TensorFlow/data/coco.names',
+                                   name='IMG_0886',
+                                   letterbox_resize=True,
+                                   new_size=[416, 416],
+                                   restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
+                                   sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2),
+                         time_id
+                         )
+
+    def test_detection_all(self):
+        time_id = str(int(time())) + '_det_all'
+        os.makedirs(f'../data/{time_id}', exist_ok=False)
+
+        path = '/media/ale/Volume/SkiVideos'
+        print(f'Scanning path: {path}')
+        dirs = os.listdir(path)
+        dirs.sort()
+        for d in dirs:
+            print(f'Scanning dir: {d}')
+            files = os.listdir(os.path.join(path, d))
+            files.sort()
+            for f in files:
+                name = os.path.basename(f).split('.')[0]
+                people_detection(Namespace(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
+                                           class_name_path='../YOLOv3_TensorFlow/data/coco.names',
+                                           name=name,
+                                           video=os.path.join(path, d, f),
+                                           letterbox_resize=True,
+                                           new_size=[416, 416],
+                                           restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
+                                           sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2),
+                                 time_id)
 
 
 if __name__ == '__main__':

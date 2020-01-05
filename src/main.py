@@ -19,27 +19,60 @@ def main(args):
     time_id = int(time())
     os.makedirs(f'../data/{time_id}', exist_ok=True)
 
-    n = args.name
     detections = []
 
     ##########
     # YOLOv3 #
     ##########
 
+    detections = people_detection(args, time_id)
+
+    ###############
+    # iou tracker #
+    ###############
+
+    iou_tracking(args, time_id, detections)
+
+    ######################
+    # highlight and crop #
+    ######################
+
+    print(f'Highlighting "{args.video}" ({time_id})')
+    highlight(args.video, f'../data/{time_id}/tracks_{args.name}.txt',
+              f'../data/{time_id}/main_{args.name}.mov', False, False)
+    print(f'Cropping "{args.video}" ({time_id})')
+    crop(args.video, f'../data/{time_id}/tracks_{args.name}.txt',
+         f'../data/{time_id}/crop_{args.name}', 'mov', False, False)
+
+
+def iou_tracking(args, time_id, detections):
+    print(f'Doing iou_tracking on "{args.video}" ({time_id})')
+    # posso metterci un ndarray in load_mot
+    detections = load_mot(np.array(detections))
+    start = time()
+    tracks = track_iou(detections, args.sigma_l, args.sigma_h, args.sigma_iou, args.t_min)
+    end = time()
+    num_frames = len(detections)
+    print(f"Tracking done in {end - start} at {str(int(num_frames / (end - start)))}fps")
+    save_to_csv(f'../data/{time_id}/tracks_{args.name}.txt', tracks)
+
+
+def people_detection(args, time_id):
     args.anchors = parse_anchors(args.anchor_path)
     args.classes = read_class_names(args.class_name_path)
     args.num_class = len(args.classes)
-
-    vid = cv2.VideoCapture(f'../data/vids/{n}.MOV')
+    vid = cv2.VideoCapture(args.video)
     video_frame_count = int(vid.get(7))
     video_fps = int(vid.get(5))
 
+    print(f'Doing detection on "{args.video}" ({time_id})')
     print(f"Video fps: {video_fps}")
 
+    detections = []
     with tf.Session() as sess:
         input_data = tf.placeholder(tf.float32, [1, args.new_size[1], args.new_size[0], 3], name='input_data')
         yolo_model = yolov3(args.num_class, args.anchors)
-        with tf.variable_scope('yolov3'):
+        with tf.variable_scope('yolov3', reuse=tf.AUTO_REUSE):
             pred_feature_maps = yolo_model.forward(input_data, False)
         pred_boxes, pred_confs, pred_probs = yolo_model.predict(pred_feature_maps)
 
@@ -81,40 +114,14 @@ def main(args):
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
     end = time()
-    print(f"Detection done in {end - start}s, {(end - start) / video_frame_count}s/f = {video_frame_count / (end - start)}f/s")
-
+    print(
+        f"Detection done in {end - start}s, {(end - start) / video_frame_count}s/f = {video_frame_count / (end - start)}f/s")
     vid.release()
-
-    with open(f'../data/{time_id}/det_{n}.txt', "w") as f:
+    with open(f'../data/{time_id}/det_{args.name}.txt', "w") as f:
         for d in detections:
             print(*d, sep=",", file=f)
-
-    ###############
-    # iou tracker #
-    ###############
-
-    # posso metterci un ndarray in load_mot
-    detections = load_mot(np.array(detections))
-
-    start = time()
-    tracks = track_iou(detections, args.sigma_l, args.sigma_h, args.sigma_iou, args.t_min)
-    end = time()
-
-    num_frames = len(detections)
-    print(f"Tracking done in {end - start} at {str(int(num_frames / (end - start)))}fps")
-
-    save_to_csv(f'../data/{time_id}/tracks_{n}.txt', tracks)
-
-    ######################
-    # highlight and crop #
-    ######################
-
-    highlight(f'../data/vids/{n}.MOV', f'../data/{time_id}/tracks_{n}.txt', f'../data/{time_id}/main_{n}.mov',
-              False, False)
-    crop(f'../data/vids/{n}.MOV', f'../data/{time_id}/tracks_{n}.txt', f'../data/{time_id}/crop_{n}', 'mov',
-         False, False)
+    return detections
 
 
 if __name__ == '__main__':
@@ -133,7 +140,9 @@ if __name__ == '__main__':
     parser.add_argument('-tm', '--t_min', type=float, default=60,
                         help="minimum track length")
     parser.add_argument("name", type=str,
-                        help="The name of the input video.")
+                        help="The name of the video.")
+    parser.add_argument("video", type=str,
+                        help="The name of the input video file.")
     parser.add_argument("--anchor_path", type=str, default="../YOLOv3_TensorFlow/data/yolo_anchors.txt",
                         help="The path of the anchor txt file.")
     parser.add_argument("--new_size", nargs='*', type=int, default=[416, 416],

@@ -3,7 +3,7 @@
 	url = git@github.com:Alebat/YOLOv3_TensorFlow.git
 [submodule "iou_tracker"]
 	path = iou_tracker
-	url = git@github.com:bochinski/iou-tracker.git
+	url = git@github.com:Alebat/iou-tracker.git
 [submodule "tracking_wo_bnw"]
 	path = tracking_wo_bnw
 	url = git@github.com:Alebat/tracking_wo_bnw.git

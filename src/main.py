@@ -17,8 +17,8 @@ import argparse
 
 import torch
 from .ski import SkiSequence
-from tracktor.tracker import Tracker
-from tracktor.reid.resnet import resnet50
+from tracking_wo_bnw.src.tracktor.tracker import Tracker
+from tracking_wo_bnw.src.tracktor.reid.resnet import resnet50
 
 
 def main(args):

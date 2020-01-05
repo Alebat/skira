@@ -83,7 +83,7 @@ def wobnw_tracking(video, name, time_id, detections, seed=12345,
             # Do camera motion compensation
             "do_align": True,
             # Which warp mode to use (cv2.MOTION_EUCLIDEAN, cv2.MOTION_AFFINE, ...)
-            "warp_mode": "cv2.MOTION_EUCLIDEAN",
+            "warp_mode": str(cv2.MOTION_EUCLIDEAN),
             # maximal number of iterations (original 50)
             "number_of_iterations": 100,
             # Threshold increment between two iterations (original 0.001)

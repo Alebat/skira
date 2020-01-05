@@ -1,24 +1,25 @@
+import argparse
+import os
+from time import time
+
 import cv2
 import numpy as np
 import tensorflow as tf
-import os
-import os.path as osp
+import torch
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from YOLOv3_TensorFlow.model import yolov3
 from YOLOv3_TensorFlow.utils.data_aug import letterbox_resize
 from YOLOv3_TensorFlow.utils.misc_utils import parse_anchors, read_class_names
 from YOLOv3_TensorFlow.utils.nms_utils import gpu_nms
-from src.bboxes import crop, highlight
 from iou_tracker.iou_tracker import track_iou
 from iou_tracker.util import load_mot, save_to_csv
-from time import time
-import argparse
-
-import torch
-from .ski import SkiSequence
-from tracking_wo_bnw.src.tracktor.tracker import Tracker
+from src.bboxes import crop, highlight
+from tracking_wo_bnw.src.tracktor.frcnn_fpn import FRCNN_FPN
 from tracking_wo_bnw.src.tracktor.reid.resnet import resnet50
+from tracking_wo_bnw.src.tracktor.tracker import Tracker
+from .ski import SkiSequence
 
 
 def main(args):
@@ -52,7 +53,7 @@ def main(args):
 
 
 def wobnw_tracking(video, name, time_id, detections, seed=12345,
-                   # obj_detect_model="tracking_wo_bnw/output/faster_rcnn_fpn_training_mot_17/model_epoch_27.model",
+                   obj_detect_model="faster_rcnn_fpn_training_mot_17/model_epoch_27.model",
                    reid_weights="reid/res50-mot17-batch_hard/ResNet_iter_25245.pth",
                    tracker_cfg=None,
                    frame_split=None):
@@ -113,6 +114,13 @@ def wobnw_tracking(video, name, time_id, detections, seed=12345,
     # object detection
     print("Initializing object detector.")
 
+    obj_detect = FRCNN_FPN(num_classes=2)
+    obj_detect.load_state_dict(torch.load(obj_detect_model,
+                               map_location=lambda storage, loc: storage))
+
+    obj_detect.eval()
+    obj_detect.cuda()
+
     # reid
     reid_network = resnet50(pretrained=False, output_dim=128)
     reid_network.load_state_dict(torch.load(reid_weights,
@@ -120,30 +128,30 @@ def wobnw_tracking(video, name, time_id, detections, seed=12345,
     reid_network.eval()
     reid_network.cuda()
 
-    tracker = Tracker(None, reid_network, tracker_cfg)
+    tracker = Tracker(obj_detect, reid_network, tracker_cfg)
 
     time_total = 0
     num_frames = 0
-    with open(f'../data/{time_id}/tracks_{name}.txt'):
-        seq = SkiSequence(video, detections)
-        tracker.reset()
-        start = time()
+    seq = SkiSequence(video, detections)
+    tracker.reset()
+    start = time()
 
-        print(f"Tracking: {seq}")
-        for i, frame in enumerate(tqdm(seq)):
-            if len(seq) * frame_split[0] <= i <= len(seq) * frame_split[1]:
-                tracker.step(frame)
-                num_frames += 1
-        results = tracker.get_results()
+    print(f"Tracking: {seq}")
+    data_loader = DataLoader(seq, batch_size=1, shuffle=False)
+    for i, frame in enumerate(tqdm(data_loader)):
+        if len(seq) * frame_split[0] <= i <= len(seq) * frame_split[1]:
+            tracker.step(frame)
+            num_frames += 1
+    results = tracker.get_results()
 
-        time_total += time() - start
+    time_total += time() - start
 
-        print(f"Tracks found: {len(results)}")
-        print(f"Runtime for {seq}: {time() - start :.1f} s.")
+    print(f"Tracks found: {len(results)}")
+    print(f"Runtime for {seq}: {time() - start :.1f} s.")
 
-        output_file = f'../data/{time_id}/tracks_{name}.txt'
-        print(f"Writing predictions to: {output_file}")
-        seq.write_results(results, output_file)
+    output_file = f'../data/{time_id}/tracks_{name}.txt'
+    print(f"Writing predictions to: {output_file}")
+    seq.write_results(results, output_file)
 
 
 def iou_tracking(args, time_id, detections):

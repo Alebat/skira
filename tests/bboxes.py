@@ -86,12 +86,13 @@ class MyTestCase(unittest.TestCase):
 
     def test_tracking_wo_bnw(self):
         time_id = f'{int(time())}_wobnw_1578220812'
-        os.makedirs(f'../data/{time_id}_wobnw', exist_ok=False)
+        os.makedirs(f'../data/{time_id}', exist_ok=False)
 
         wobnw_tracking(video='../data/1578220812/main_IMG_0886.MOV',
                        name='IMG_0886',
                        time_id=time_id,
-                       detections='../data/1578220812/det_IMG_0886_hi_res_det.MOV',
+                       detections='../data/1578220812/det_IMG_0886_hi_res_det.txt',
+                       obj_detect_model='../tracking_wo_bnw/output/faster_rcnn_fpn_training_mot_17/model_epoch_27.model',
                        reid_weights="../tracking_wo_bnw/output/tracktor/reid/res50-mot17-batch_hard/ResNet_iter_25245"
                                     ".pth")
 

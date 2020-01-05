@@ -1,13 +1,9 @@
 import csv
-import os
-import os.path as osp
-
-import numpy as np
-from torch.utils.data import Dataset
 
 import cv2
+import numpy as np
 import pandas as pd
-
+from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
 
 
@@ -24,8 +20,6 @@ def read_images(vc, rotate90=False):
             f += 1
 
 
-
-
 class SkiSequence(Dataset):
     def __init__(self, video, detections):
         self._det = detections if not isinstance(detections, str) \
@@ -36,6 +30,7 @@ class SkiSequence(Dataset):
                              names=['frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf', 'x', 'y', 'z'])
         self.no_gt = True
         self._video = video
+        self._transform = ToTensor()
         self._data, self._len = self._sequence()
 
     def __len__(self):
@@ -49,12 +44,16 @@ class SkiSequence(Dataset):
         if f in self._det.index:
             dets = self._det.loc[[f]]
             conv = np.array([det.astype(np.float32) for det in dets.values[:, 1:5]])
+            conf = np.array([det.astype(np.float32) for det in dets.values[:, 5]])
         else:
             conv = np.ndarray((0,))
+            conf = np.ndarray((0,))
 
         sample = {
-            'img': img,
+            'img': self._transform(img),
             'dets': conv,
+            'conf': conf,
+            'index': f,
         }
 
         return sample

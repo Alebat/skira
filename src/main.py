@@ -16,10 +16,6 @@ from time import time
 import argparse
 
 import torch
-from torch.utils.data import DataLoader
-import motmetrics as mm
-from tracktor.frcnn_fpn import FRCNN_FPN
-from tracktor.config import get_output_dir
 from .ski import SkiSequence
 from tracktor.tracker import Tracker
 from tracktor.reid.resnet import resnet50
@@ -103,7 +99,6 @@ def wobnw_tracking(video, name, time_id, detections, seed=12345,
         }
     if frame_split is None:
         frame_split = [0.0, 1.0]
-    mm.lap.default_solver = 'lap'
 
     # set all seeds
     torch.manual_seed(seed)

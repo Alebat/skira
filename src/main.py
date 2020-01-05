@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import os
+import os.path as osp
 from tqdm import tqdm
 
 from YOLOv3_TensorFlow.model import yolov3
@@ -13,6 +14,15 @@ from iou_tracker.iou_tracker import track_iou
 from iou_tracker.util import load_mot, save_to_csv
 from time import time
 import argparse
+
+import torch
+from torch.utils.data import DataLoader
+import motmetrics as mm
+from tracktor.frcnn_fpn import FRCNN_FPN
+from tracktor.config import get_output_dir
+from .ski import SkiSequence
+from tracktor.tracker import Tracker
+from tracktor.reid.resnet import resnet50
 
 
 def main(args):
@@ -43,6 +53,102 @@ def main(args):
     print(f'Cropping "{args.video}" ({time_id})')
     crop(args.video, f'../data/{time_id}/tracks_{args.name}.txt',
          f'../data/{time_id}/crop_{args.name}', 'mov', False, False)
+
+
+def wobnw_tracking(video, name, time_id, detections, seed=12345,
+                   # obj_detect_model="tracking_wo_bnw/output/faster_rcnn_fpn_training_mot_17/model_epoch_27.model",
+                   reid_weights="reid/res50-mot17-batch_hard/ResNet_iter_25245.pth",
+                   tracker_cfg=None,
+                   frame_split=None):
+    if tracker_cfg is None:
+        tracker_cfg = {
+            # FRCNN score threshold for detections
+            "detection_person_thresh": 0.2,
+            # FRCNN score threshold for keeping the track alive
+            "regression_person_thresh": 0.2,
+            # NMS threshold for detection
+            "detection_nms_thresh": 0.2,
+            # NMS theshold while tracking
+            "regression_nms_thresh": 0.3,
+            # motion model settings
+            "motion_model": {
+                "enabled": False,
+                # average velocity over last n_steps steps
+                "n_steps": 1,
+                # if true, only model the movement of the bounding box center.
+                # If false, width and height are also modeled.
+                "center_only": True,
+            },
+            # DPM or DPM_RAW or 0, raw includes the unfiltered (no nms) versions of the provided detections,
+            # 0 tells the tracker to use private detections (Faster R-CNN)
+            "public_detections": True,
+            # How much last appearance features are to keep
+            "max_features_num": 10,
+            # Do camera motion compensation
+            "do_align": True,
+            # Which warp mode to use (cv2.MOTION_EUCLIDEAN, cv2.MOTION_AFFINE, ...)
+            "warp_mode": cv2.MOTION_EUCLIDEAN,
+            # maximal number of iterations (original 50)
+            "number_of_iterations": 100,
+            # Threshold increment between two iterations (original 0.001)
+            "termination_eps": 0.00001,
+            # Use siamese network to do reid
+            "do_reid": True,
+            # How much timesteps dead tracks are kept and cosidered for reid
+            "inactive_patience": 20,
+            # How similar do image and old track need to be to be considered the same person
+            "reid_sim_threshold": 2.0,
+            # How much IoU do track and image need to be considered for matching
+            "reid_iou_threshold": 0.5,
+        }
+    if frame_split is None:
+        frame_split = [0.0, 1.0]
+    mm.lap.default_solver = 'lap'
+
+    # set all seeds
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+
+    ##########################
+    # Initialize the modules #
+    ##########################
+
+    # object detection
+    print("Initializing object detector.")
+
+    # reid
+    reid_network = resnet50(pretrained=False, output_dim=128)
+    reid_network.load_state_dict(torch.load(reid_weights,
+                                            map_location=lambda storage, loc: storage))
+    reid_network.eval()
+    reid_network.cuda()
+
+    tracker = Tracker(None, reid_network, tracker_cfg)
+
+    time_total = 0
+    num_frames = 0
+    with open(f'../data/{time_id}/tracks_{name}.txt'):
+        seq = SkiSequence(video, detections)
+        tracker.reset()
+        start = time()
+
+        print(f"Tracking: {seq}")
+        for i, frame in enumerate(tqdm(seq)):
+            if len(seq) * frame_split[0] <= i <= len(seq) * frame_split[1]:
+                tracker.step(frame)
+                num_frames += 1
+        results = tracker.get_results()
+
+        time_total += time() - start
+
+        print(f"Tracks found: {len(results)}")
+        print(f"Runtime for {seq}: {time() - start :.1f} s.")
+
+        output_file = f'../data/{time_id}/tracks_{name}.txt'
+        print(f"Writing predictions to: {output_file}")
+        seq.write_results(results, output_file)
 
 
 def iou_tracking(args, time_id, detections):
@@ -125,7 +231,6 @@ def people_detection(args, time_id):
 
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser(description="IOU Tracker demo script")
     # parser.add_argument('-d', '--detection_path', type=str, required=True,
     #                     help="full path to CSV file containing the detections")

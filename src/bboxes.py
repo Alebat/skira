@@ -64,11 +64,11 @@ def process(tracks, images, rel=True, parallel_chunk=0, max_parallel=50):
         return prev * a + value * (1 - a)
 
     box = {}
-    for f, i in images:
-        if f in tracks.index:
-            dets = tracks.loc[[f]]
-            for _, det in dets.iterrows():
-                n, x, y, xx, yy, _, _, _, _ = det
+    for frame_num, frame in images:
+        if frame_num in tracks.index:
+            detections = tracks.loc[[frame_num]]
+            for _, row in detections.iterrows():
+                n, x, y, xx, yy, _, _, _, _ = row
                 n = int(n)
                 if True:  # n // max_parallel == parallel_chunk:
                     if rel:
@@ -78,7 +78,7 @@ def process(tracks, images, rel=True, parallel_chunk=0, max_parallel=50):
                     cy = y / 2 + yy / 2
                     edge = int(max(xx - x, yy - y, 24) * 1.5)
 
-                    h, w, _ = i.shape
+                    h, w, _ = frame.shape
 
                     if n in box:
                         pcx, pcy, pedge = box[n]
@@ -96,15 +96,15 @@ def process(tracks, images, rel=True, parallel_chunk=0, max_parallel=50):
                     sqy2 = cy + edge
 
                     if sqx1 < 0 or sqx2 > w or sqy1 < 0 or sqy2 > h:
-                        color = np.mean(i, axis=(0, 1))
-                        safe = cv2.copyMakeBorder(i, int(edge), int(edge), int(edge), int(edge), cv2.BORDER_CONSTANT,
+                        color = np.mean(frame, axis=(0, 1))
+                        safe = cv2.copyMakeBorder(frame, int(edge), int(edge), int(edge), int(edge), cv2.BORDER_CONSTANT,
                                                   value=tuple(color))
                         sqx1 += edge
                         sqx2 += edge
                         sqy1 += edge
                         sqy2 += edge
                     else:
-                        safe = i
+                        safe = frame
 
                     cropped = safe[int(sqy1):int(sqy2), int(sqx1):int(sqx2), :]
                     # print(n, sqx1, sqx2, sqy1, sqy2, safe.shape, cropped.shape)

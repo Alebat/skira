@@ -4,7 +4,7 @@ from argparse import Namespace
 from time import time
 
 from src.bboxes import crop, highlight
-from src.main import main, people_detection
+from src.main import main, people_detection, wobnw_tracking
 
 
 class MyTestCase(unittest.TestCase):
@@ -17,8 +17,8 @@ class MyTestCase(unittest.TestCase):
              False, True)
 
     def test_something2_1(self):
-        highlight('../data/vids/IMG_0886.MOV', '../data/1578220812/tracks_IMG_0886_hi_res_det.txt', '../data/1578220812/main_IMG_0886.MOV',
-                  False, False)
+        highlight('../data/vids/IMG_0886.MOV', '../data/1578220812/tracks_IMG_0886_hi_res_det.txt',
+                  '../data/1578220812/main_IMG_0886.MOV', False, False)
 
     def test_something2_2(self):
         # highlight('../data/vids/IMG_0886.MOV', '../data/1577561725/tracks_IMG_0886.txt',
@@ -58,8 +58,7 @@ class MyTestCase(unittest.TestCase):
                                    new_size=[416, 416],
                                    restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
                                    sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2),
-                         time_id
-                         )
+                         time_id)
 
     def test_detection_all(self):
         time_id = str(int(time())) + '_det_all'
@@ -84,6 +83,17 @@ class MyTestCase(unittest.TestCase):
                                            restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
                                            sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2),
                                  time_id)
+
+    def test_tracking_wo_bnw(self):
+        time_id = f'{int(time())}_wobnw_1578220812'
+        os.makedirs(f'../data/{time_id}_wobnw', exist_ok=False)
+
+        wobnw_tracking(video='../data/1578220812/main_IMG_0886.MOV',
+                       name='IMG_0886',
+                       time_id=time_id,
+                       detections='../data/1578220812/det_IMG_0886_hi_res_det.MOV',
+                       reid_weights="../tracking_wo_bnw/output/tracktor/reid/res50-mot17-batch_hard/ResNet_iter_25245"
+                                    ".pth")
 
 
 if __name__ == '__main__':

@@ -3,8 +3,42 @@ import unittest
 from argparse import Namespace
 from time import time
 
+import pandas as pd
+import sacred
+
 from src.bboxes import crop, highlight
-from src.main import main, people_detection, wobnw_tracking
+from src.main import main, wobnw_tracking, iou_tracking, iou_mom_tracking
+from src.main import people_detection
+
+ex = sacred.Experiment("uno")
+ex.observers.append(sacred.observers.FileStorageObserver("runs"))
+
+
+@ex.capture
+def detection(**kwargs):
+    ex.add_resource(kwargs['video'])
+    people_detection(**kwargs)
+
+
+@ex.capture
+def tracking_iou(**kwargs):
+    ex.add_resource(kwargs['video'])
+    iou_tracking(**kwargs)
+
+
+@ex.capture
+def tracking_iou_mom(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom):
+    return iou_mom_tracking(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom)
+
+
+@ex.capture
+def highlighting(**kwargs):
+    people_detection(**kwargs)
+
+
+@ex.capture
+def cropping(**kwargs):
+    people_detection(**kwargs)
 
 
 class MyTestCase(unittest.TestCase):
@@ -35,7 +69,7 @@ class MyTestCase(unittest.TestCase):
                        letterbox_resize=True,
                        new_size=[416, 416],
                        restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
-                       sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2))
+                       sigma_l=0, sigma_h=0.5, sigma_iou=0.6, t_min=59))
 
     def test_main_hi_res(self):
         main(Namespace(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
@@ -45,23 +79,35 @@ class MyTestCase(unittest.TestCase):
                        letterbox_resize=True,
                        new_size=[832, 416],
                        restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
-                       sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2))
+                       sigma_l=0, sigma_h=0.5, sigma_iou=0.6, t_min=59))
+
+    def test_main_custom_res(self):
+        main(Namespace(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
+                       class_name_path='../YOLOv3_TensorFlow/data/coco.names',
+                       name='IMG_0886_custom_res_det',
+                       video='../data/vids/IMG_0886.MOV',
+                       letterbox_resize=True,
+                       new_size=[1280, 720],
+                       restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
+                       sigma_l=0, sigma_h=0.5, sigma_iou=0.6, t_min=59))
 
     def test_detection(self):
         time_id = int(time())
         os.makedirs(f'../data/{time_id}', exist_ok=False)
+        name = 'IMG_0886'
 
-        people_detection(Namespace(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
-                                   class_name_path='../YOLOv3_TensorFlow/data/coco.names',
-                                   name='IMG_0886',
-                                   video='../data/vids/IMG_0886.MOV',
-                                   letterbox_resize=True,
-                                   new_size=[416, 416],
-                                   restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
-                                   sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2),
-                         time_id)
+        detections = detection(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
+                               class_name_path='../YOLOv3_TensorFlow/data/coco.names',
+                               restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
+                               video='../data/vids/IMG_0886.MOV',
+                               letterbox_resize=True,
+                               new_size=[416, 416],
+                               )
+        with open(f'../data/{time_id}/det_{name}.txt', "w") as f:
+            for d in detections:
+                print(*d, sep=",", file=f)
 
-    def test_detection_all_hi_res(self):
+    def test_detection_all(self):
         time_id = str(int(time())) + '_det_all_hres'
         os.makedirs(f'../data/{time_id}', exist_ok=False)
 
@@ -75,15 +121,17 @@ class MyTestCase(unittest.TestCase):
             files.sort()
             for f in files:
                 name = os.path.basename(f).split('.')[0]
-                people_detection(Namespace(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
-                                           class_name_path='../YOLOv3_TensorFlow/data/coco.names',
-                                           name=name,
-                                           video=os.path.join(path, d, f),
-                                           letterbox_resize=True,
-                                           new_size=[832, 416],
-                                           restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
-                                           sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2),
-                                 time_id)
+                detections = people_detection(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
+                                              class_name_path='../YOLOv3_TensorFlow/data/coco.names',
+                                              video=os.path.join(path, d, f),
+                                              letterbox_resize=True,
+                                              new_size=[1024, 576],
+                                              restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
+                                              )
+
+                with open(f'../data/{time_id}/det_{name}.txt', "w") as f:
+                    for det in detections:
+                        print(*det, sep=",", file=f)
 
     def test_tracking_wo_bnw(self):
         time_id = f'{int(time())}_wobnw_1578220812'
@@ -96,6 +144,32 @@ class MyTestCase(unittest.TestCase):
                        reid_weights="../tracking_wo_bnw/output/tracktor/reid/res50-mot17-batch_hard/ResNet_iter_25245"
                                     ".pth",
                        output_file=f'../data/{time_id}/tracks_{name}.txt')
+
+    def test_tracker_iou_mom(self):
+        time_id = f'iou_mom_mom_{int(time())}'
+
+        detections = pd.read_csv('../data/1578309853_custom_res_det/det_IMG_0886_custom_res_det.txt',
+                                 sep=',',
+                                 header=None,
+                                 names=['frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf', 'x', 'y',
+                                        'z'])
+
+        tracking_iou_mom(
+            detections=detections,
+            sigma_l=0,
+            sigma_h=0.5,
+            sigma_iou=0.6,
+            t_min=59,
+            ttl=10,
+            mom_alpha=0.95,
+            exp_zoom=1.001,
+        )
+
+        output = f'/tmp/{time()}_tracking_iou_mom_tracks.txt'
+        ex.add_artifact(output, "tracks")
+
+        # highlight('../data/vids/IMG_0886.MOV', f'../data/{time_id}/tracks_IMG_0886_iou_mom_mom.txt',
+        #           f'../data/{time_id}/main_IMG_0886.MOV', False, False)
 
 
 if __name__ == '__main__':

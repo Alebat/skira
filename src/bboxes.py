@@ -54,6 +54,7 @@ def draw_bb(tracks, images, rel=True):
                     xx = x + xx
                     yy = y + yy
                 cv2.rectangle(i, (int(x), int(y)), (int(xx), int(yy)), hsv2rgb(n * 49 % 15 / 15, 1, 1), 2)
+                cv2.putText(i, str(n), (int(x), int(y) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, color=hsv2rgb(n * 49 % 15 / 15, 1, 1))
         yield i
 
 
@@ -136,12 +137,13 @@ def crop(input_video, input_detections, output_video, output_videos_extension, r
     tracks.sort_values('id', inplace=True)
     for i in range(0, len(tracks), 50):
         vc = cv2.VideoCapture(input_video)
+        chunk = tracks.query(f'{i} < id < {i+50}')
         multisave(output_video,
                   output_videos_extension,
-                  tqdm(process(tracks.query(f'{i} < id < {i+50}'),
+                  tqdm(process(chunk,
                                read_images(vc, rotate90),
                                rel=relative_bboxes),
-                       total=len(tracks),
-                       unit='frame'),
+                       total=len(chunk),
+                       unit='tracks'),
                   vc.get(5))
         vc.release()

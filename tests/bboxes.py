@@ -30,7 +30,7 @@ class MyTestCase(unittest.TestCase):
     def test_main(self):
         main(Namespace(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
                        class_name_path='../YOLOv3_TensorFlow/data/coco.names',
-                       name='IMG_0886',
+                       name='IMG_0886_std_res_det',
                        video='../data/vids/IMG_0886.MOV',
                        letterbox_resize=True,
                        new_size=[416, 416],
@@ -49,19 +49,20 @@ class MyTestCase(unittest.TestCase):
 
     def test_detection(self):
         time_id = int(time())
-        os.makedirs(f'../data/{time_id}_det', exist_ok=False)
+        os.makedirs(f'../data/{time_id}', exist_ok=False)
 
         people_detection(Namespace(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
                                    class_name_path='../YOLOv3_TensorFlow/data/coco.names',
                                    name='IMG_0886',
+                                   video='../data/vids/IMG_0886.MOV',
                                    letterbox_resize=True,
                                    new_size=[416, 416],
                                    restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
                                    sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2),
                          time_id)
 
-    def test_detection_all(self):
-        time_id = str(int(time())) + '_det_all'
+    def test_detection_all_hi_res(self):
+        time_id = str(int(time())) + '_det_all_hres'
         os.makedirs(f'../data/{time_id}', exist_ok=False)
 
         path = '/media/ale/Volume/SkiVideos'
@@ -79,7 +80,7 @@ class MyTestCase(unittest.TestCase):
                                            name=name,
                                            video=os.path.join(path, d, f),
                                            letterbox_resize=True,
-                                           new_size=[416, 416],
+                                           new_size=[832, 416],
                                            restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
                                            sigma_h=0.5, sigma_iou=0.5, sigma_l=0, t_min=2),
                                  time_id)
@@ -87,14 +88,14 @@ class MyTestCase(unittest.TestCase):
     def test_tracking_wo_bnw(self):
         time_id = f'{int(time())}_wobnw_1578220812'
         os.makedirs(f'../data/{time_id}', exist_ok=False)
+        name = 'IMG_0886'
 
         wobnw_tracking(video='../data/1578220812/main_IMG_0886.MOV',
-                       name='IMG_0886',
-                       time_id=time_id,
                        detections='../data/1578220812/det_IMG_0886_hi_res_det.txt',
                        obj_detect_model='../tracking_wo_bnw/output/faster_rcnn_fpn_training_mot_17/model_epoch_27.model',
                        reid_weights="../tracking_wo_bnw/output/tracktor/reid/res50-mot17-batch_hard/ResNet_iter_25245"
-                                    ".pth")
+                                    ".pth",
+                       output_file=f'../data/{time_id}/tracks_{name}.txt')
 
 
 if __name__ == '__main__':

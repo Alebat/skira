@@ -52,9 +52,10 @@ def main(args):
          f'../data/{time_id}/crop_{args.name}', 'mov', False, False)
 
 
-def wobnw_tracking(video, name, time_id, detections, seed=12345,
+def wobnw_tracking(video, detections, seed=12345,
                    obj_detect_model="faster_rcnn_fpn_training_mot_17/model_epoch_27.model",
                    reid_weights="reid/res50-mot17-batch_hard/ResNet_iter_25245.pth",
+                   output_file=f'../data/tracks.txt',
                    tracker_cfg=None,
                    frame_split=None):
     if tracker_cfg is None:
@@ -149,7 +150,6 @@ def wobnw_tracking(video, name, time_id, detections, seed=12345,
     print(f"Tracks found: {len(results)}")
     print(f"Runtime for {seq}: {time() - start :.1f} s.")
 
-    output_file = f'../data/{time_id}/tracks_{name}.txt'
     print(f"Writing predictions to: {output_file}")
     seq.write_results(results, output_file)
 

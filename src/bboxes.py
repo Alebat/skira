@@ -1,8 +1,8 @@
+import colorsys
+
 import cv2
 import numpy as np
 import pandas as pd
-import colorsys
-
 from tqdm import tqdm
 
 
@@ -133,9 +133,15 @@ def crop(input_video, input_detections, output_video, output_videos_extension, r
                          header=None,
                          index_col=0,
                          names=['frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf', 'x', 'y', 'z'])
-    vc = cv2.VideoCapture(input_video)
-    multisave(output_video,
-              output_videos_extension,
-              tqdm(process(tracks, read_images(vc, rotate90), rel=relative_bboxes), total=len(tracks), unit='frame'),
-              vc.get(5))
-    vc.release()
+    tracks.sort_values('id', inplace=True)
+    for i in range(0, len(tracks), 50):
+        vc = cv2.VideoCapture(input_video)
+        multisave(output_video,
+                  output_videos_extension,
+                  tqdm(process(tracks.query(f'{i} < id < {i+50}'),
+                               read_images(vc, rotate90),
+                               rel=relative_bboxes),
+                       total=len(tracks),
+                       unit='frame'),
+                  vc.get(5))
+        vc.release()

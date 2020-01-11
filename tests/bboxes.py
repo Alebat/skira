@@ -7,38 +7,11 @@ import pandas as pd
 import sacred
 
 from src.bboxes import crop, highlight
-from src.main import main, wobnw_tracking, iou_tracking, iou_mom_tracking
+from src.main import main, wobnw_tracking, iou_mom_tracking
 from src.main import people_detection
 
 ex = sacred.Experiment("uno")
 ex.observers.append(sacred.observers.FileStorageObserver("runs"))
-
-
-@ex.capture
-def detection(**kwargs):
-    ex.add_resource(kwargs['video'])
-    people_detection(**kwargs)
-
-
-@ex.capture
-def tracking_iou(**kwargs):
-    ex.add_resource(kwargs['video'])
-    iou_tracking(**kwargs)
-
-
-@ex.capture
-def tracking_iou_mom(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom):
-    return iou_mom_tracking(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom)
-
-
-@ex.capture
-def highlighting(**kwargs):
-    people_detection(**kwargs)
-
-
-@ex.capture
-def cropping(**kwargs):
-    people_detection(**kwargs)
 
 
 class MyTestCase(unittest.TestCase):
@@ -96,7 +69,7 @@ class MyTestCase(unittest.TestCase):
         os.makedirs(f'../data/{time_id}', exist_ok=False)
         name = 'IMG_0886'
 
-        detections = detection(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
+        detections = people_detection(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
                                class_name_path='../YOLOv3_TensorFlow/data/coco.names',
                                restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
                                video='../data/vids/IMG_0886.MOV',
@@ -154,7 +127,7 @@ class MyTestCase(unittest.TestCase):
                                  names=['frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf', 'x', 'y',
                                         'z'])
 
-        tracking_iou_mom(
+        iou_mom_tracking(
             detections=detections,
             sigma_l=0,
             sigma_h=0.5,

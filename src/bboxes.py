@@ -54,11 +54,12 @@ def draw_bb(tracks, images, rel=True):
                     xx = x + xx
                     yy = y + yy
                 cv2.rectangle(i, (int(x), int(y)), (int(xx), int(yy)), hsv2rgb(n * 49 % 15 / 15, 1, 1), 2)
-                cv2.putText(i, str(n), (int(x), int(y) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, color=hsv2rgb(n * 49 % 15 / 15, 1, 1))
+                cv2.putText(i, str(int(n)), (int(x), int(y) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                            color=hsv2rgb(n * 49 % 15 / 15, 1, 1))
         yield i
 
 
-def process(tracks, images, rel=True, parallel_chunk=0, max_parallel=50):
+def process(tracks, images, rel=True):
     a = .9
 
     def low_pass(prev, value):
@@ -98,7 +99,8 @@ def process(tracks, images, rel=True, parallel_chunk=0, max_parallel=50):
 
                     if sqx1 < 0 or sqx2 > w or sqy1 < 0 or sqy2 > h:
                         color = np.mean(frame, axis=(0, 1))
-                        safe = cv2.copyMakeBorder(frame, int(edge), int(edge), int(edge), int(edge), cv2.BORDER_CONSTANT,
+                        safe = cv2.copyMakeBorder(frame, int(edge), int(edge), int(edge), int(edge),
+                                                  cv2.BORDER_CONSTANT,
                                                   value=tuple(color))
                         sqx1 += edge
                         sqx2 += edge
@@ -108,7 +110,6 @@ def process(tracks, images, rel=True, parallel_chunk=0, max_parallel=50):
                         safe = frame
 
                     cropped = safe[int(sqy1):int(sqy2), int(sqx1):int(sqx2), :]
-                    # print(n, sqx1, sqx2, sqy1, sqy2, safe.shape, cropped.shape)
                     try:
                         yield n, cv2.resize(cropped, (224, 224), interpolation=cv2.INTER_CUBIC)
                     except Exception as e:
@@ -116,34 +117,41 @@ def process(tracks, images, rel=True, parallel_chunk=0, max_parallel=50):
 
 
 def highlight(input_video, input_detections, output_video, relative_bboxes=True, rotate90=False):
-    tracks = pd.read_csv(input_detections,
-                         sep=',',
-                         header=None,
-                         index_col=0,
-                         names=['frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf', 'x', 'y', 'z'])
+    if isinstance(input_detections, str):
+        input_detections = pd.read_csv(input_detections,
+                                       sep=',',
+                                       header=None,
+                                       index_col=0,
+                                       names=['frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf', 'x',
+                                              'y', 'z'])
     vc = cv2.VideoCapture(input_video)
     save(output_video,
-         tqdm(draw_bb(tracks, read_images(vc, rotate90), rel=relative_bboxes), total=vc.get(7), unit='frame'),
+         tqdm(draw_bb(input_detections, read_images(vc, rotate90), rel=relative_bboxes), total=vc.get(7), unit='frame'),
          vc.get(5))
     vc.release()
 
 
-def crop(input_video, input_detections, output_video, output_videos_extension, relative_bboxes=True, rotate90=False):
-    tracks = pd.read_csv(input_detections,
-                         sep=',',
-                         header=None,
-                         index_col=0,
-                         names=['frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf', 'x', 'y', 'z'])
-    tracks.sort_values('id', inplace=True)
-    for i in range(0, len(tracks), 50):
+def crop(input_video, input_tracks, output_video, output_videos_extension, relative_bboxes=True, rotate90=False):
+    if isinstance(input_tracks, str):
+        input_tracks = pd.read_csv(input_tracks,
+                                   sep=',',
+                                   header=None,
+                                   index_col=0,
+                                   names=['frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf', 'x',
+                                          'y', 'z'])
+    input_tracks.sort_values('id', inplace=True)
+    n_tracks = input_tracks['id'].max()
+    for i in range(0, n_tracks, 50):
+        print(f'{i} / {n_tracks}')
         vc = cv2.VideoCapture(input_video)
-        chunk = tracks.query(f'{i} < id < {i+50}')
+        length = vc.get(7)
+        chunk = input_tracks.query(f'{i} < id < {i + 50}')
         multisave(output_video,
                   output_videos_extension,
-                  tqdm(process(chunk,
-                               read_images(vc, rotate90),
-                               rel=relative_bboxes),
-                       total=len(chunk),
-                       unit='tracks'),
+                  process(chunk,
+                          tqdm(read_images(vc, rotate90),
+                               total=length,
+                               unit='frames'),
+                          rel=relative_bboxes),
                   vc.get(5))
         vc.release()

@@ -166,9 +166,9 @@ def iou_tracking(args, time_id, detections):
     save_to_csv(f'../data/{time_id}/tracks_{args.name}.txt', tracks)
 
 
-def iou_mom_tracking(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom):
+def iou_mom_tracking(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom, min_area=0):
     detections = load_mot(np.array(detections))
-    tracks = track_iou(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom)
+    tracks = track_iou(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom, min_area)
     return tracks
 
 

@@ -71,12 +71,12 @@ class MyTestCase(unittest.TestCase):
         name = 'IMG_0886'
 
         detections = people_detection(anchor_path='../YOLOv3_TensorFlow/data/yolo_anchors.txt',
-                               class_name_path='../YOLOv3_TensorFlow/data/coco.names',
-                               restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
-                               video='../data/vids/IMG_0886.MOV',
-                               letterbox_resize=True,
-                               new_size=[416, 416],
-                               )
+                                      class_name_path='../YOLOv3_TensorFlow/data/coco.names',
+                                      restore_path='../YOLOv3_TensorFlow/data/darknet_weights/yolov3.ckpt',
+                                      video='../data/vids/IMG_0886.MOV',
+                                      letterbox_resize=True,
+                                      new_size=[416, 416],
+                                      )
         with open(f'../data/{time_id}/det_{name}.txt', "w") as f:
             for d in detections:
                 print(*d, sep=",", file=f)

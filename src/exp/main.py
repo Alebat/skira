@@ -25,10 +25,10 @@ def iou_tracking(args, time_id, detections):
     save_to_csv(f'../data/{time_id}/tracks_{args.name}.txt', tracks)
 
 
-def iou_mom_tracking(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom, min_area=0):
+def iou_mom_tracking(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom, fps, min_area=0):
     detections = load_mot(np.array(detections))
-    tracks = track_iou(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom, min_area)
-    return tracks
+    return track_iou(detections, sigma_l, sigma_h, sigma_iou, t_min*fps, ttl*fps, mom_alpha, exp_zoom ** (fps / 60),
+                     min_area)
 
 
 def people_detection(video, class_name_path, anchor_path, new_size, restore_path,
@@ -36,14 +36,14 @@ def people_detection(video, class_name_path, anchor_path, new_size, restore_path
     anchors = parse_anchors(anchor_path)
     classes = read_class_names(class_name_path)
     num_class = len(classes)
-    vid = cv2.VideoCapture(video)
-    video_frame_count = int(vid.get(7))
-    video_fps = int(vid.get(5))
+    if isinstance(video, str):
+        video = cv2.VideoCapture(video)
+    video_frame_count = int(video.get(7))
+    video_fps = int(video.get(5))
 
     print(f'Doing detection on "{video}"')
     print(f"Video fps: {video_fps}")
 
-    detections = []
     with tf.Session() as sess:
         input_data = tf.placeholder(tf.float32, [1, new_size[1], new_size[0], 3], name='input_data')
         yolo_model = yolov3(num_class, anchors)
@@ -61,7 +61,7 @@ def people_detection(video, class_name_path, anchor_path, new_size, restore_path
 
         start = time()
         for i in tqdm(range(video_frame_count)):
-            ret, img_ori = vid.read()
+            ret, img_ori = video.read()
             # img_ori = cv2.rotate(img_ori, cv2.ROTATE_90_CLOCKWISE)
             if letterbox_resize:
                 img, resize_ratio, dw, dh = letterbox_resize_f(img_ori, *new_size)
@@ -85,13 +85,12 @@ def people_detection(video, class_name_path, anchor_path, new_size, restore_path
             for bi in range(len(boxes_)):
                 if classes[labels_[bi]] == 'person':
                     x0, y0, x1, y1 = boxes_[bi]
-                    detections.append([i, -1, x0, y0, x1, y1, scores_[bi], -1, -1, -1])
+                    yield [i, -1, x0, y0, x1, y1, scores_[bi], -1, -1, -1]
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
     end = time()
     print(
         f"Detection done in {end - start}s, {(end - start) / video_frame_count}s/f = {video_frame_count / (end - start)}f/s")
-    vid.release()
-    return detections
+    video.release()
 

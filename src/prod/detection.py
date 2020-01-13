@@ -2,6 +2,7 @@ from time import time
 
 import os
 import sacred
+from tqdm import tqdm
 
 from src.exp.main import people_detection
 
@@ -26,13 +27,17 @@ def config_1():
 @ex.automain
 def main(video_directory, detect_people_params):
     assert os.path.exists(video_directory), video_directory
-
+    print(f'Scanning root {video_directory}')
+    files = []
     for directory, _, filenames in os.walk(video_directory):
         print(f'Scanning {directory}')
         for file in filenames:
             path = os.path.join(directory, file)
-            tmp_output = f'/tmp/{time()}_detections.txt'
-            with open(tmp_output, "w") as f:
-                for d in people_detection(video=path, **detect_people_params):
-                    print(*d, sep=",", file=f)
-            ex.add_artifact(tmp_output, "detections.txt")
+            files.append(path)
+
+    for file in tqdm(files):
+        tmp_output = f'/tmp/{time()}_detections.txt'
+        with open(tmp_output, "w") as f:
+            for d in people_detection(video=file, **detect_people_params):
+                print(*d, sep=",", file=f)
+        ex.add_artifact(tmp_output, "detections.txt")

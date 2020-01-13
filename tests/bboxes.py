@@ -7,8 +7,9 @@ import pandas as pd
 import sacred
 
 from src.exp.bboxes import crop, highlight
-from src.exp.main import main, wobnw_tracking, iou_mom_tracking
+from src.exp.main import main, iou_mom_tracking
 from src.exp.main import people_detection
+from src.exp.wobnw_tracking import wobnw_tracking
 
 ex = sacred.Experiment("uno")
 ex.observers.append(sacred.observers.FileStorageObserver("runs"))

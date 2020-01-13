@@ -26,9 +26,12 @@ def iou_tracking(args, time_id, detections):
 
 
 def iou_mom_tracking(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_alpha, exp_zoom, fps, min_area=0):
-    detections = load_mot(np.array(detections))
-    return track_iou(detections, sigma_l, sigma_h, sigma_iou, t_min*fps, ttl*fps, mom_alpha, exp_zoom ** (fps / 60),
+    if len(detections) > 0:
+        detections = load_mot(np.array(detections))
+        return track_iou(detections, sigma_l, sigma_h, sigma_iou, t_min*fps, ttl*fps, mom_alpha, exp_zoom ** (fps / 60),
                      min_area)
+    else:
+        return []
 
 
 def people_detection(video, class_name_path, anchor_path, new_size, restore_path,

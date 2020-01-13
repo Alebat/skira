@@ -1,12 +1,12 @@
-import os
 from time import time
 
+import os
 import pandas as pd
 
 from iou_tracker.util import save_to_csv
-from src.base_experiment import get_skira_exp
-from src.bboxes import highlight
-from src.main import iou_mom_tracking
+from src.exp.base_experiment import get_skira_exp
+from src.exp.bboxes import highlight
+from src.exp.main import iou_mom_tracking
 
 ex = get_skira_exp("test_tracking_iou_mom")
 

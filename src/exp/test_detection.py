@@ -1,8 +1,9 @@
-import os
 from time import time
 
-from src.base_experiment import get_skira_exp
-from src.main import people_detection
+import os
+
+from src.exp.base_experiment import get_skira_exp
+from src.exp.main import people_detection
 
 ex = get_skira_exp("test_detection")
 

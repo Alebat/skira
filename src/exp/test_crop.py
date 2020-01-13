@@ -1,10 +1,10 @@
-import os
 from time import time
 
+import os
 import pandas as pd
 
-from src.base_experiment import get_skira_exp
-from src.bboxes import crop
+from src.exp.base_experiment import get_skira_exp
+from src.exp.bboxes import crop
 
 ex = get_skira_exp("test_crop")
 

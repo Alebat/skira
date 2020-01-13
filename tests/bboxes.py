@@ -1,14 +1,14 @@
-import os
 import unittest
 from argparse import Namespace
 from time import time
 
+import os
 import pandas as pd
 import sacred
 
-from src.bboxes import crop, highlight
-from src.main import main, wobnw_tracking, iou_mom_tracking
-from src.main import people_detection
+from src.exp.bboxes import crop, highlight
+from src.exp.main import main, wobnw_tracking, iou_mom_tracking
+from src.exp.main import people_detection
 
 ex = sacred.Experiment("uno")
 ex.observers.append(sacred.observers.FileStorageObserver("runs"))

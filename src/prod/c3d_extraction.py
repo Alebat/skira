@@ -3,16 +3,13 @@ from time import time
 import cv2
 import numpy as np
 import os
-import sacred
 from tqdm import tqdm
 
 from C3D_tensorflow.extract_c3d_sports1M import BATCH_SIZE, extract_c3d
+from src.exp.base_experiment import get_skira_exp
 from src.exp.bboxes import read_images
 
-name = "extract_c3d_fc6"
-ex = sacred.Experiment(name)
-ex.observers.append(sacred.observers.FileStorageObserver(f'runs/{name}'))
-ex.add_config('config.json')
+ex = get_skira_exp("extract_c3d_fc6")
 
 
 @ex.config

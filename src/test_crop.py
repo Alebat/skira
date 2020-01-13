@@ -67,7 +67,7 @@ def config_3():
 def config_4():
     tmp_dir = f'/tmp/{time()}_test_crop'
 
-    video = "Salizzona/IMG_0886.MOV"
+    video = "Fondo Piccolo/IMG_0990.MOV"
 
     os.mkdir(tmp_dir)
 

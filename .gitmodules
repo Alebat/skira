@@ -7,3 +7,6 @@
 [submodule "tracking_wo_bnw"]
 	path = tracking_wo_bnw
 	url = git@github.com:Alebat/tracking_wo_bnw.git
+[submodule "C3D_tensorflow"]
+	path = C3D_tensorflow
+	url = git@github.com:Alebat/C3D-tensorflow.git

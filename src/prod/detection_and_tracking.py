@@ -65,33 +65,34 @@ def main(video_directory, detect_people_params, tracking_iou_mom_params):
             files.append(path)
 
     for file in tqdm(files):
-        with PeopleDetection(**detect_people_params) as detector:
-            print()
+        detector = PeopleDetection(**detect_people_params)
+        print()
 
-            common = os.path.commonprefix([video_directory, file])
-            file_id = file[len(common):].replace("/", "_")
+        common = os.path.commonprefix([video_directory, file])
+        file_id = file[len(common):].replace("/", "_")
 
-            print("Working on:", file_id)
+        print("Working on:", file_id)
 
-            tmp_output = f'/tmp/{time()}_detections.txt'
-            tmp_output_t = f'/tmp/{time()}_tracks.txt'
+        tmp_output = f'/tmp/{time()}_detections.txt'
+        tmp_output_t = f'/tmp/{time()}_tracks.txt'
 
-            # Detection
+        # Detection
 
-            vc = cv2.VideoCapture(file)
-            video_fps = vc.get(cv2.CAP_PROP_FPS)
-            video_frames_count = int(vc.get(cv2.CAP_PROP_FRAME_COUNT))
+        vc = cv2.VideoCapture(file)
+        video_fps = vc.get(cv2.CAP_PROP_FPS)
+        video_frames_count = int(vc.get(cv2.CAP_PROP_FRAME_COUNT))
 
-            detections = record(
-                tmp_output,
-                detector.process([img for f, img in read_images(vc)], video_frames_count)
-            )
+        detections = record(
+            tmp_output,
+            detector.process(map(lambda f_img: f_img[1], read_images(vc)), video_frames_count)
+        )
 
-            # Tracking
+        # Tracking
 
-            tracks = iou_mom_tracking(list(detections), fps=video_fps, **tracking_iou_mom_params)
+        tracks = iou_mom_tracking(list(detections), fps=video_fps, **tracking_iou_mom_params)
 
-            save_to_csv(tmp_output_t, tracks)
+        save_to_csv(tmp_output_t, tracks)
 
-            ex.add_artifact(tmp_output, f'detections-{file_id}.txt')
-            ex.add_artifact(tmp_output_t, f'tracks-{file_id}.txt')
+        ex.add_artifact(tmp_output, f'detections-{file_id}.txt')
+        ex.add_artifact(tmp_output_t, f'tracks-{file_id}.txt')
+        detector.close()

@@ -44,6 +44,7 @@ def config_1():
         # Patience in seconds
         ttl=1/6,
     )
+    resume = None
 
 
 def record(output_file, stream):
@@ -54,7 +55,7 @@ def record(output_file, stream):
 
 
 @ex.automain
-def main(video_directory, detect_people_params, tracking_iou_mom_params):
+def main(video_directory, detect_people_params, tracking_iou_mom_params, resume):
     assert os.path.exists(video_directory), video_directory
     print(f'Scanning root {video_directory}')
     files = []
@@ -64,7 +65,14 @@ def main(video_directory, detect_people_params, tracking_iou_mom_params):
             path = os.path.join(directory, file)
             files.append(path)
 
-    for file in tqdm(files):
+    total = len(files)
+
+    if resume is not None:
+        ind = files.index(resume)
+        files = files[ind:]
+        print(f'Resuming...')
+
+    for file in tqdm(files, initial=total-len(files), total=total):
         detector = PeopleDetection(**detect_people_params)
         print()
 
@@ -72,6 +80,7 @@ def main(video_directory, detect_people_params, tracking_iou_mom_params):
         file_id = file[len(common):].replace("/", "_")
 
         print("Working on:", file_id)
+        print("Path:", file)
 
         tmp_output = f'/tmp/{time()}_detections.txt'
         tmp_output_t = f'/tmp/{time()}_tracks.txt'

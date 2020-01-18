@@ -16,7 +16,6 @@ def config_1():
     os.mkdir(tmp_dir)
 
     crop_params = dict(
-        output_video=os.path.join(tmp_dir, f'output'),
         output_videos_extension='mov',
         relative_bboxes=False,
         rotate90=False,
@@ -62,6 +61,7 @@ def main(video_directory, crop_params, tracks_directory, tmp_dir):
                                                   'x', 'y', 'z'])
 
                 crop(
+                    output_video=os.path.join(tmp_dir, f'output-{file_id}'),
                     input_tracks=input_tracks,
                     input_video=file,
                     **crop_params

@@ -29,7 +29,7 @@ def iou_mom_tracking(detections, sigma_l, sigma_h, sigma_iou, t_min, ttl, mom_al
     if len(detections) > 0:
         detections = load_mot(np.array(detections))
         return track_iou(detections, sigma_l, sigma_h, sigma_iou, t_min*fps, ttl*fps, mom_alpha, exp_zoom ** (fps / 60),
-                     min_area)
+                         min_area)
     else:
         return []
 

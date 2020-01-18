@@ -59,11 +59,11 @@ def draw_bb(tracks, images, rel=True):
         yield i
 
 
-def low_pass(prev, value, a=.9):
+def low_pass(prev, value, a=.95):
     return prev * a + value * (1 - a)
 
 
-def filter_box(boxes, n, rel, x, xx, y, yy):
+def apply_filter(boxes, n, rel, x, xx, y, yy):
     if rel:
         xx += x
         yy += y
@@ -93,9 +93,9 @@ def process(tracks, images, rel=True):
     boxes = {}
     for frame_num, track_id in sorted(tracks.index, key=lambda x: -x[0]):
         x, y, xx, yy, _, _, _, _ = tracks.loc[frame_num, track_id]
-        inv_tracks.loc[frame_num, track_id] = [filter_box(boxes, track_id, rel, x, xx, y, yy)]
+        inv_tracks.loc[frame_num, track_id] = [apply_filter(boxes, track_id, rel, x, xx, y, yy)]
 
-    # filter tracks in opposite direction to compose a zero-phase filter
+    # filter tracks to compose a zero-phase filter
     boxes = {}
     images = iter(images)
     frame_n, frame = next(images)
@@ -105,7 +105,7 @@ def process(tracks, images, rel=True):
             frame_n, frame = next(images)
         x, y, xx, yy, _, _, _, _ = tracks.loc[frame_num, n]
 
-        edge, sqx1, sqx2, sqy1, sqy2 = filter_box(boxes, n, rel, x, xx, y, yy)
+        edge, sqx1, sqx2, sqy1, sqy2 = apply_filter(boxes, n, rel, x, xx, y, yy)
         if_edge, if_sqx1, if_sqx2, if_sqy1, if_sqy2 = inv_tracks.loc[frame_num, n][0]
 
         sqx1 = (sqx1 + if_sqx1) / 2

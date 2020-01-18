@@ -59,61 +59,80 @@ def draw_bb(tracks, images, rel=True):
         yield i
 
 
+def low_pass(prev, value, a=.9):
+    return prev * a + value * (1 - a)
+
+
+def filter_box(boxes, n, rel, x, xx, y, yy):
+    if rel:
+        xx += x
+        yy += y
+    cx = x / 2 + xx / 2
+    cy = y / 2 + yy / 2
+    edge = int(max(xx - x, yy - y, 24) * 1.5)
+    if n in boxes:
+        pcx, pcy, pedge = boxes[n]
+
+        cx = low_pass(pcx, cx)
+        cy = low_pass(pcy, cy)
+        edge = low_pass(pedge, edge)
+    boxes[n] = cx, cy, edge
+    # double the edge
+    sqx1 = cx - edge
+    sqx2 = cx + edge
+    sqy1 = cy - edge
+    sqy2 = cy + edge
+    return edge, sqx1, sqx2, sqy1, sqy2
+
+
 def process(tracks, images, rel=True):
-    a = .9
+    tracks.sort_index(inplace=True)
+    inv_tracks = pd.DataFrame(index=tracks.index, columns=['data'])
 
-    def low_pass(prev, value):
-        return prev * a + value * (1 - a)
+    # filter tracks in opposite direction to compose a zero-phase filter
+    boxes = {}
+    for frame_num, track_id in sorted(tracks.index, key=lambda x: -x[0]):
+        x, y, xx, yy, _, _, _, _ = tracks.loc[frame_num, track_id]
+        inv_tracks.loc[frame_num, track_id] = [filter_box(boxes, track_id, rel, x, xx, y, yy)]
 
-    box = {}
-    for frame_num, frame in images:
-        if frame_num in tracks.index:
-            detections = tracks.loc[[frame_num]]
-            for _, row in detections.iterrows():
-                n, x, y, xx, yy, _, _, _, _ = row
-                n = int(n)
-                if True:  # n // max_parallel == parallel_chunk:
-                    if rel:
-                        xx += x
-                        yy += y
-                    cx = x / 2 + xx / 2
-                    cy = y / 2 + yy / 2
-                    edge = int(max(xx - x, yy - y, 24) * 1.5)
+    # filter tracks in opposite direction to compose a zero-phase filter
+    boxes = {}
+    images = iter(images)
+    frame_n, frame = next(images)
+    for frame_num, n in tracks.index:
+        while frame_n < frame_num:
+            # fast forward
+            frame_n, frame = next(images)
+        x, y, xx, yy, _, _, _, _ = tracks.loc[frame_num, n]
 
-                    h, w, _ = frame.shape
+        edge, sqx1, sqx2, sqy1, sqy2 = filter_box(boxes, n, rel, x, xx, y, yy)
+        if_edge, if_sqx1, if_sqx2, if_sqy1, if_sqy2 = inv_tracks.loc[frame_num, n][0]
 
-                    if n in box:
-                        pcx, pcy, pedge = box[n]
+        sqx1 = (sqx1 + if_sqx1) / 2
+        sqx2 = (sqx2 + if_sqx2) / 2
+        sqy1 = (sqy1 + if_sqy1) / 2
+        sqy2 = (sqy2 + if_sqy2) / 2
+        edge = (edge + if_edge) / 2
 
-                        cx = low_pass(pcx, cx)
-                        cy = low_pass(pcy, cy)
-                        edge = low_pass(pedge, edge)
+        h, w, _ = frame.shape
 
-                    box[n] = cx, cy, edge
+        if sqx1 < 0 or sqx2 > w or sqy1 < 0 or sqy2 > h:
+            color = np.mean(frame, axis=(0, 1))
+            safe = cv2.copyMakeBorder(frame, int(edge), int(edge), int(edge), int(edge),
+                                      cv2.BORDER_CONSTANT,
+                                      value=tuple(color))
+            sqx1 += edge
+            sqx2 += edge
+            sqy1 += edge
+            sqy2 += edge
+        else:
+            safe = frame
 
-                    # double the larger edge of the rectangle
-                    sqx1 = cx - edge
-                    sqx2 = cx + edge
-                    sqy1 = cy - edge
-                    sqy2 = cy + edge
-
-                    if sqx1 < 0 or sqx2 > w or sqy1 < 0 or sqy2 > h:
-                        color = np.mean(frame, axis=(0, 1))
-                        safe = cv2.copyMakeBorder(frame, int(edge), int(edge), int(edge), int(edge),
-                                                  cv2.BORDER_CONSTANT,
-                                                  value=tuple(color))
-                        sqx1 += edge
-                        sqx2 += edge
-                        sqy1 += edge
-                        sqy2 += edge
-                    else:
-                        safe = frame
-
-                    cropped = safe[int(sqy1):int(sqy2), int(sqx1):int(sqx2), :]
-                    try:
-                        yield n, cv2.resize(cropped, (224, 224), interpolation=cv2.INTER_CUBIC)
-                    except Exception as e:
-                        print(e)
+        cropped = safe[int(sqy1):int(sqy2), int(sqx1):int(sqx2), :]
+        try:
+            yield n, cv2.resize(cropped, (224, 224), interpolation=cv2.INTER_CUBIC)
+        except Exception as e:
+            print(w, h, int(sqy1), int(sqy2), int(sqx1), int(sqx2), e)
 
 
 def highlight(input_video, input_detections, output_video, relative_bboxes=True, rotate90=False):
@@ -131,27 +150,27 @@ def highlight(input_video, input_detections, output_video, relative_bboxes=True,
     vc.release()
 
 
-def crop(input_video, input_tracks, output_video, output_videos_extension, relative_bboxes=True, rotate90=False):
+def crop(input_video, input_tracks, output_video, output_videos_extension, relative_bboxes=True, rotate90=False, parallel=100):
     if isinstance(input_tracks, str):
         input_tracks = pd.read_csv(input_tracks,
                                    sep=',',
                                    header=None,
-                                   index_col=0,
+                                   index_col=[0, 1],
                                    names=['frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf', 'x',
                                           'y', 'z'])
-    input_tracks.sort_values('id', inplace=True)
-    n_tracks = input_tracks['id'].max()
-    for i in range(0, n_tracks, 50):
-        print(f'{i} / {n_tracks}')
-        vc = cv2.VideoCapture(input_video)
-        length = vc.get(7)
-        chunk = input_tracks.query(f'{i} < id < {i + 50}')
-        multisave(output_video,
-                  output_videos_extension,
-                  process(chunk,
-                          tqdm(read_images(vc, rotate90),
-                               total=length,
-                               unit='frames'),
-                          rel=relative_bboxes),
-                  vc.get(5))
-        vc.release()
+    if len(input_tracks) > 0:
+        n_tracks = int(max(map(lambda x: x[1], input_tracks.index)))
+        for i in range(0, n_tracks, parallel):
+            print(f'{i} to {i + parallel - 1} / {n_tracks}')
+            vc = cv2.VideoCapture(input_video)
+            length = vc.get(7)
+            chunk = input_tracks.query(f'{i} < id < {i + parallel}')
+            multisave(output_video,
+                      output_videos_extension,
+                      process(chunk,
+                              tqdm(read_images(vc, rotate90),
+                                   total=length,
+                                   unit='frames'),
+                              rel=relative_bboxes),
+                      vc.get(5))
+            vc.release()

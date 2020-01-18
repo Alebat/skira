@@ -91,7 +91,7 @@ def test_crop(video_directory, video, tracks_file, crop_params, tmp_dir):
     input_tracks = pd.read_csv(tracks_file,
                                sep=',',
                                header=None,
-                               index_col=0,
+                               index_col=[0, 1],
                                names=['frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf', 'x',
                                       'y', 'z'])
 

@@ -150,7 +150,7 @@ def highlight(input_video, input_detections, output_video, relative_bboxes=True,
     vc.release()
 
 
-def crop(input_video, input_tracks, output_video, output_videos_extension, relative_bboxes=True, rotate90=False, parallel=100):
+def crop(input_video, input_tracks, output_video, output_videos_extension, relative_bboxes=True, rotate90=False, parallel=75):
     if isinstance(input_tracks, str):
         input_tracks = pd.read_csv(input_tracks,
                                    sep=',',

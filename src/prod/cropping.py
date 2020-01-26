@@ -2,7 +2,6 @@ from time import time
 
 import os
 import pandas as pd
-from tqdm import tqdm
 
 from src.exp.base_experiment import get_skira_exp
 from src.exp.bboxes import crop
@@ -22,10 +21,11 @@ def config_1():
     )
 
     tracks_directory = ''
+    resume = None
 
 
 @ex.automain
-def main(video_directory, crop_params, tracks_directory, tmp_dir):
+def main(video_directory, crop_params, tracks_directory, tmp_dir, resume):
     assert os.path.exists(tracks_directory), tracks_directory
     print(f'Scanning root {tracks_directory}')
     t_files = os.listdir(tracks_directory)
@@ -40,12 +40,17 @@ def main(video_directory, crop_params, tracks_directory, tmp_dir):
             path = os.path.join(directory, file)
             files.append(path)
 
-    for file in tqdm(files, unit='videos'):
+    if resume is not None:
+        ind = files.index(resume)
+        files = files[ind:]
+        print(f'Resuming...')
+
+    for n, file in enumerate(files):
         common = os.path.commonprefix([video_directory, file])
         file_id = file[len(common):].replace("/", "_")
         tracks_filename = f'tracks-{file_id}.txt'
         if tracks_filename in video_ids:
-            print()
+            print(f'Video {n} of {len(files)}')
 
             tracks_path = os.path.join(tracks_directory, tracks_filename)
 

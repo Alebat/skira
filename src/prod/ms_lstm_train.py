@@ -27,10 +27,8 @@ def train_shuffle(min_mse, max_corr, trainset, testset, models_dir):
     round_max_spea = 0
     round_min_mse = 200
 
-    trainLoader = torch.utils.data.DataLoader(trainset,
-                                              batch_size=128, shuffle=True, num_workers=0)
-    testLoader = torch.utils.data.DataLoader(testset,
-                                             batch_size=64, shuffle=False, num_workers=0)
+    trainLoader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=0)
+    testLoader = torch.utils.data.DataLoader(testset, batch_size=64, shuffle=False, num_workers=0)
 
     # build the model
     scoring = Scoring(feature_size=4096)
@@ -41,9 +39,10 @@ def train_shuffle(min_mse, max_corr, trainset, testset, models_dir):
     print("Total Params: " + str(total_params))
     optimizer = optim.Adam(params=scoring.parameters(), lr=0.0005)  # use SGD optimizer to optimize the loss function
     scheduler = lr_scheduler.StepLR(optimizer, step_size=70, gamma=0.7)
-    for epoch in range(500):  # total 40 epoches
+    for epoch in range(50):  # total 40 epoches
         # scheduler.step()
-        print("Epoch:  " + str(epoch) + "Total Params: %d" % total_params)
+        print("Epoch: " + str(epoch))
+        print("Total Params: %d" % total_params)
         total_regr_loss = 0
         total_sample = 0
         for i, (features, scores) in enumerate(trainLoader):  # get mini-batch
@@ -115,8 +114,8 @@ def main(directory, ground_truth, test_size, seed):
             print('c3d-_output-' + '-'.join(name.split('-')[1:]), mark, sep=',', file=test if i < test_size else train)
         train.close()
         test.close()
-    ex.add_artifact(tmp_tr)
-    ex.add_artifact(tmp_te)
+    ex.add_artifact(tmp_tr, "train.txt")
+    ex.add_artifact(tmp_te, "test.txt")
 
     trainset = videoDataset(root=directory,
                             label=tmp_tr, suffix=".npy", transform=transform, data=None)

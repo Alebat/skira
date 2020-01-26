@@ -43,13 +43,16 @@ def main(model_name, videos_directory, device):
     curr = None
     for prediction, descriptor in features:
         if descriptor[0] != curr:
+            print()
+            print("Extracted ", curr)
             if curr is not None:
-                np.save(tmp_output, np.array(file))
+                arr = np.array(file)
+                print("Saving ", curr, arr.shape)
+                np.save(tmp_output, arr)
                 common = os.path.commonprefix([videos_directory, curr])
                 file_id = curr[len(common):].replace("/", "_")
-                ex.add_artifact(tmp_output, f'detections-{file_id}.npy')
+                ex.add_artifact(tmp_output, f'c3d-{file_id}.npy')
 
             file = []
             curr = descriptor[0]
-            print("Extracting from", curr)
         file.append(prediction)

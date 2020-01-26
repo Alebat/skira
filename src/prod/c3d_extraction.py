@@ -39,20 +39,23 @@ def main(model_name, videos_directory, device):
 
     features = extract_c3d(BATCH_SIZE, device, model_name, tqdm(named_videos, total=len(test_videos)))
 
-    file = []
-    curr = None
-    for prediction, descriptor in features:
-        if descriptor[0] != curr:
+    def save(current, file, tmp_output, videos_directory):
+        if current is not None:
             print()
-            print("Extracted ", curr)
-            if curr is not None:
-                arr = np.array(file)
-                print("Saving ", curr, arr.shape)
-                np.save(tmp_output, arr)
-                common = os.path.commonprefix([videos_directory, curr])
-                file_id = curr[len(common):].replace("/", "_")
-                ex.add_artifact(tmp_output, f'c3d-{file_id}.npy')
+            print("Extracted ", current)
+            arr = np.array(file)
+            print("Saving ", arr.shape)
+            np.save(tmp_output, arr)
+            common = os.path.commonprefix([videos_directory, current])
+            file_id = current[len(common):].replace("/", "_")
+            ex.add_artifact(tmp_output, f'c3d-{file_id}.npy')
 
+    file = None
+    current = None
+    for prediction, descriptor in features:
+        if descriptor[0] != current:
+            save(current, file, tmp_output, videos_directory)
+            current = descriptor[0]
             file = []
-            curr = descriptor[0]
         file.append(prediction)
+    save(current, file, tmp_output, videos_directory)

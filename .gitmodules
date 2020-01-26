@@ -10,3 +10,6 @@
 [submodule "C3D_tensorflow"]
 	path = C3D_tensorflow
 	url = git@github.com:Alebat/C3D-tensorflow.git
+[submodule "MS_LSTM"]
+	path = MS_LSTM
+	url = https://github.com/loadder/MS_LSTM

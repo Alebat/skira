@@ -37,7 +37,7 @@ def main(model_name, videos_directory, device):
 
     tmp_output = f'/tmp/{time()}_c3d_feats.npy'
 
-    features = extract_c3d(BATCH_SIZE, device, model_name, tqdm(named_videos, total=len(test_videos)))
+    features = extract_c3d(BATCH_SIZE, device, model_name, tqdm(named_videos, total=len(test_videos)), augment=True)
 
     def save(current, file, tmp_output, videos_directory):
         if current is not None:

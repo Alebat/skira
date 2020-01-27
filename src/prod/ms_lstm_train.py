@@ -8,11 +8,11 @@ import torch.optim as optim
 import torch.utils.data as data
 from scipy.stats import spearmanr as sr
 from torch.autograd import Variable
-from torch.optim import lr_scheduler
 
 from MS_LSTM.dataloader import videoDataset, transform
 from MS_LSTM.model import Scoring
 from src.exp.base_experiment import get_skira_exp
+from src.util.one_cycle import OneCycleLR
 
 ex = get_skira_exp("train_ms_lstm")
 
@@ -21,9 +21,11 @@ ex = get_skira_exp("train_ms_lstm")
 def config_1():
     test_size = 100
     ground_truth = "data/selected/gt.txt"
+    epochs = 40
+    lr_range = (3e-4, 1e-2)
 
 
-def train_shuffle(min_mse, max_corr, trainset, testset, models_dir):
+def train_shuffle(min_mse, max_corr, trainset, testset, models_dir, epochs, lr_range):
     round_max_spea = 0
     round_min_mse = 200
 
@@ -37,11 +39,13 @@ def train_shuffle(min_mse, max_corr, trainset, testset, models_dir):
 
     total_params = sum(p.numel() for p in scoring.parameters() if p.requires_grad)
     print("Total Params: " + str(total_params))
-    optimizer = optim.Adam(params=scoring.parameters(), lr=0.0005)  # use SGD optimizer to optimize the loss function
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=70, gamma=0.7)
-    for epoch in range(50):  # total 40 epoches
-        # scheduler.step()
-        print("Epoch: " + str(epoch))
+    optimizer = optim.Adam(params=scoring.parameters())  # use SGD optimizer to optimize the loss function
+
+    scheduler = OneCycleLR(optimizer, epochs, lr_range)
+    for epoch in range(epochs):  # total 40 epoches
+        scheduler.step()
+        print(f"Epoch: {epoch}")
+        print(f"LR: {scheduler.get_lr()}")
         print("Total Params: %d" % total_params)
         total_regr_loss = 0
         total_sample = 0
@@ -99,7 +103,7 @@ def train_shuffle(min_mse, max_corr, trainset, testset, models_dir):
 
 
 @ex.automain
-def main(directory, ground_truth, test_size, seed):
+def main(directory, ground_truth, test_size, seed, epochs, lr_range):
     random.seed(seed)
     assert os.path.exists(ground_truth), "ground_truth"
     tmp_tr = f"/tmp/train_dataset_{time()}.txt"
@@ -128,7 +132,7 @@ def main(directory, ground_truth, test_size, seed):
     min_mse = 200
     max_corr = 0
     for _ in range(5):
-        min_mse, max_corr = train_shuffle(min_mse, max_corr, trainset, testset, tmp_dir)
+        min_mse, max_corr = train_shuffle(min_mse, max_corr, trainset, testset, tmp_dir, epochs, lr_range)
 
     for f in os.listdir(tmp_dir):
         ex.add_artifact(os.path.join(tmp_dir, f))

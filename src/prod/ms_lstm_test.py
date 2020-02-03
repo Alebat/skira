@@ -1,49 +1,37 @@
 from time import time
 
+import numpy as np
 import os
+import random
+import torch
 import torch.utils.data as data
+from torch.autograd import Variable
 
 from MS_LSTM.dataloader import videoDataset, transform
 from MS_LSTM.model import Scoring
 from src.exp.base_experiment import get_skira_exp
 
-ex = get_skira_exp("train_ms_lstm")
+ex = get_skira_exp("test_ms_lstm")
 
 
 @ex.config
 def config_1():
-    test_size = 100
+    test_size = 50
     ground_truth = "data/selected/gt.txt"
 
 
-import torch
-from torch.autograd import Variable
-import numpy as np
-import random
-
-# load the train and test dataset
-"""
-samples = []
-f = open("./data/annotations.txt").readlines()
-for line in f:
-    items = line.strip().split(' ')
-    samples.append((items[0], float(items[1])))
-"""
-w = open("./result/final_result.txt", 'w')
 
 
 def test_shuffle(testset, model):
     testLoader = torch.utils.data.DataLoader(testset, batch_size=64, shuffle=False, num_workers=0)
 
-    #build the model
+    # build the model
     scoring = Scoring(feature_size=4096)
     if torch.cuda.is_available():
         scoring.cuda()
 
     scoring.load_state_dict(torch.load(model))
     scoring.eval()
-    min_mse = 200
-    max_corr = 0
     for epoch in range(1):  # total 40 epoches
         scoring.eval()
         val_pred = []
@@ -83,7 +71,7 @@ def main(directory, ground_truth, test_size, seed, model):
     ex.add_artifact(tmp_te)
 
     testset = videoDataset(root=directory,
-                           label=tmp_te, suffix='.npy', transform=transform, data=None)
+                           label=tmp_te, suffixes='.npy', transform=transform, data=None)
 
     tmp_dir = f"/tmp/models_{time()}"
     os.mkdir(tmp_dir)

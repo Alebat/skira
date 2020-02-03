@@ -21,13 +21,14 @@ ex = get_skira_exp("train_ms_lstm")
 def config_1():
     test_size = 100
     ground_truth = "data/selected/gt.txt"
-    epochs = 50
+    epochs = 60
     lr_range = (2e-3, 2e-2)
     model = 'scoring'
 
 
-def train_shuffle(model, min_mse, max_corr, trainset, testset, models_dir, epochs, lr_range, time_n):
+def train_shuffle(model, min_mse, max_corr, max_corrp, trainset, testset, models_dir, epochs, lr_range, time_n):
     round_max_spea = 0
+    round_max_pear = 0
     round_min_mse = 200
 
     trainLoader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=0)
@@ -38,14 +39,15 @@ def train_shuffle(model, min_mse, max_corr, trainset, testset, models_dir, epoch
     if torch.cuda.is_available():
         scoring.cuda()
 
-    print(f"Parameters: {scoring.parameters()}")
     optimizer = optim.Adam(params=scoring.parameters())
     scheduler = OneCycleLR(optimizer, epochs, lr_range)
 
+    total_params = sum(p.numel() for p in scoring.parameters() if p.requires_grad)
+    print("Total Params: " + str(total_params))
+
     for epoch in range(epochs):
         scheduler.step()
-        print(f"Epoch: {epoch}")
-        print(f"LR: {scheduler.get_lr()}")
+        print(f'Epoch: {epoch}, LR: {scheduler.get_lr()}')
         total_regr_loss = 0
         total_scoring_mse = 0
         total_sample = 0
@@ -59,7 +61,7 @@ def train_shuffle(model, min_mse, max_corr, trainset, testset, models_dir, epoch
                 regr_loss = scoring_mse
             else:
                 regr_loss = scoring_mse + penal
-            # new three lines are back propagation/home/ale/source/skira/src/prod
+            # new three lines are back propagation
             optimizer.zero_grad()
             regr_loss.backward()
             # nn.utils.clip_grad_norm(scoring.parameters(), 1.5)
@@ -92,24 +94,27 @@ def train_shuffle(model, min_mse, max_corr, trainset, testset, models_dir, epoch
         val_pred = np.concatenate(val_pred)
         val_sr, _ = sr(val_truth, val_pred)
         val_pr, _ = pearsonr(val_truth.flatten(), val_pred.flatten())
-        if val_loss / val_sample < min_mse:
-            torch.save(scoring.state_dict(), os.path.join(models_dir, f'mark_40attn.pt'))
-        min_mse = min(min_mse, val_loss / val_sample)
-        max_corr = max(max_corr, val_sr)
-        round_min_mse = min(round_min_mse, val_loss / val_sample)
-        round_max_spea = max(val_sr, round_max_spea)
+        val_mse = val_loss / val_sample
 
-        val_loss = val_loss / val_sample
-        print(f'Val Loss: {val_loss}, Spearman Corr: {val_sr}, Pearson Corr: {val_pr}')
-        print(f'Min Val Loss: {min_mse}, Max Spearman: {max_corr}')
+        if val_mse < min_mse:
+            torch.save(scoring.state_dict(), os.path.join(models_dir, f'mark_40attn.pt'))
+        min_mse = min(min_mse, val_mse)
+        max_corr = max(max_corr, val_sr)
+        max_corrp = max(max_corrp, val_pr)
+        round_min_mse = min(round_min_mse, val_mse)
+        round_max_spea = max(val_sr, round_max_spea)
+        round_max_pear = max(val_pr, round_max_pear)
+
+        print(f'Val: MSE:     {val_mse}, Spearman Corr: {val_sr}, Pearson Corr: {val_pr}')
+        print(f'Val: Min MSE: {min_mse}, Max Spearman:  {max_corr}, Max Pearson: {max_corrp}')
         scoring.train()
 
-        if training_loss < val_loss / 5:
+        if training_mse < val_mse / 5:
             print('Early stopping')
             break
 
     print('MSE: %.2f spearman: %.2f' % (round_min_mse, round_max_spea))
-    return min_mse, max_corr
+    return min_mse, max_corr, max_corrp
 
 
 @ex.automain
@@ -148,8 +153,9 @@ def main(directory, ground_truth, test_size, model, seed, epochs, lr_range):
 
     min_mse = 200
     max_corr = 0
-    for time_n in range(4):
-        min_mse, max_corr = train_shuffle(model, min_mse, max_corr, trainset, testset, tmp_dir, epochs, lr_range, time_n)
+    max_corrp = 0
+    for time_n in range(3):
+        min_mse, max_corr, max_corrp = train_shuffle(model, min_mse, max_corr, max_corrp, trainset, testset, tmp_dir, epochs, lr_range, time_n)
 
     for f in os.listdir(tmp_dir):
         ex.add_artifact(os.path.join(tmp_dir, f))

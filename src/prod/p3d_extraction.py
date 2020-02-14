@@ -55,5 +55,5 @@ def main(videos_directory):
             save(current, file, tmp_output, videos_directory)
             current = descriptor[0]
             file = []
-        file.append(prediction)
+        file.append(prediction.cpu().numpy().flatten())
     save(current, file, tmp_output, videos_directory)

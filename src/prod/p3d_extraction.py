@@ -5,7 +5,7 @@ import numpy as np
 import os
 from tqdm import tqdm
 
-from C3D_tensorflow.extract_c3d_sports1M import BATCH_SIZE, extract_p3d
+from C3D_tensorflow.extract_c3d_sports1M import extract_p3d
 from src.exp.base_experiment import get_skira_exp
 from src.exp.bboxes import read_images
 
@@ -35,7 +35,7 @@ def main(videos_directory):
 
     tmp_output = f'/tmp/{time()}_p3d_feats.npy'
 
-    features = extract_p3d(BATCH_SIZE, tqdm(named_videos, total=len(test_videos)), augment=True)
+    features = extract_p3d(40, tqdm(named_videos, total=len(test_videos)), augment=True)
 
     def save(current, file, tmp_output, videos_directory):
         if current is not None:

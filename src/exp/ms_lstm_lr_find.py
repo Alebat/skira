@@ -71,3 +71,5 @@ def main(model, directory, ground_truth, seed):
     lr_finder.plot().savefig(save_file)
 
     ex.add_artifact(save_file, "plot.pdf")
+
+    os.remove(save_file)

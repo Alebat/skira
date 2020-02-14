@@ -24,6 +24,7 @@ def config_1():
     epochs = 60
     lr_range = (2e-3, 2e-2)
     model = 'scoring'
+    text_filter=''
 
 
 def train_shuffle(model, min_mse, max_corr, max_corrp, trainset, testset, models_dir, epochs, lr_range, time_n):
@@ -116,9 +117,10 @@ def train_shuffle(model, min_mse, max_corr, max_corrp, trainset, testset, models
     print('MSE: %.2f spearman: %.2f' % (round_min_mse, round_max_spea))
     return min_mse, max_corr, max_corrp
 
+actual_filter = filter
 
 @ex.automain
-def main(directory, ground_truth, test_size, model, seed, epochs, lr_range):
+def main(directory, ground_truth, test_size, model, seed, epochs, lr_range, text_filter):
     random.seed(seed)
     assert os.path.exists(ground_truth), "ground_truth"
     tmp_tr = f"/tmp/train_dataset_{time()}.txt"
@@ -126,7 +128,7 @@ def main(directory, ground_truth, test_size, model, seed, epochs, lr_range):
     with open(ground_truth, "r") as annotations:
         train = open(tmp_tr, 'w')
         test = open(tmp_te, 'w')
-        lines = list(annotations)
+        lines = list(filter(lambda x: text_filter in x, list(annotations)))
         random.shuffle(lines)
         for i, line in enumerate(lines):
             name, mark = line.strip().split(',')

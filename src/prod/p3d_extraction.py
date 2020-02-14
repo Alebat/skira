@@ -33,7 +33,7 @@ def main(videos_directory):
         for path in test_videos
     ]
 
-    tmp_output = f'/tmp/{time()}_c3d_feats.npy'
+    tmp_output = f'/tmp/{time()}_p3d_feats.npy'
 
     features = extract_p3d(BATCH_SIZE, tqdm(named_videos, total=len(test_videos)), augment=True)
 
@@ -46,7 +46,7 @@ def main(videos_directory):
             np.save(tmp_output, arr)
             common = os.path.commonprefix([videos_directory, current])
             file_id = current[len(common):].replace("/", "_")
-            ex.add_artifact(tmp_output, f'c3d-{file_id}.npy')
+            ex.add_artifact(tmp_output, f'p3d-{file_id}.npy')
 
     file = None
     current = None

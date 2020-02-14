@@ -268,9 +268,9 @@ class P3D(nn.Module):
         x = x.view(-1, sizes[1], sizes[3], sizes[4])  # Part Res5
         x = self.layer4(x)
         x = self.avgpool(x)
-
-        x = x.view(-1, self.fc.in_features)
-        x = self.fc(self.dropout(x))
+        # HERE is the edit to keep the features
+        # x = x.view(-1, self.fc.in_features)
+        # x = self.fc(self.dropout(x))
 
         return x
 

@@ -17,12 +17,28 @@ from src.exp.base_experiment import get_skira_exp
 ex = get_skira_exp("test_ms_lstm")
 
 
+@ex.config
+def config_1():
+    test_size = None
+    ground_truth = None
+    epochs = None
+    lr_range = None
+    text_filter = ''
+
+
 @ex.automain
-def main(directory, test_set, seed, model, weights, epochs, ground_truth, lr_range, test_size):
+def main(directory, test_set, seed, model, weights, text_filter):
     random.seed(seed)
 
+    suffixes = list(filter(lambda x: text_filter in x, [
+        ".npy",
+        ".flip.npy",
+        ".lfps.npy",
+        ".flip.lfps.npy",
+    ]))
+
     testset = videoDataset(root=directory,
-                           label=test_set, suffixes='.npy', transform=lambda x, _: transform(x, 1000), data=None)
+                           label=test_set, suffixes=suffixes[0], transform=lambda x, _: transform(x, 1000), data=None)
 
     testLoader = torch.utils.data.DataLoader(testset, batch_size=64, shuffle=False, num_workers=0)
 
@@ -38,7 +54,7 @@ def main(directory, test_set, seed, model, weights, epochs, ground_truth, lr_ran
         val_sample = 0
         val_loss = 0
         val_truth = []
-        for j, (features, scores) in enumerate(testLoader):
+        for features, scores in testLoader:
             val_truth.append(scores.numpy())
             if torch.cuda.is_available():
                 features = Variable(features).cuda()

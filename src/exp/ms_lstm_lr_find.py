@@ -1,5 +1,6 @@
 from time import time
 
+import numpy as np
 import os
 import random
 import torch
@@ -16,46 +17,54 @@ ex = get_skira_exp("lr_find_ms_lstm")
 
 @ex.config
 def config_1():
-    ground_truth = "data/selected/gt.txt"
     model = 'scoring'
+    no_nfps = False
+    no_lfps = False
+    no_flip = False
+    featn = 4096
 
 
 @ex.automain
-def main(model, directory, ground_truth, seed):
+def main(model, directory, ground_truth, seed, no_nfps, no_flip, no_lfps, featn):
     random.seed(seed)
     assert os.path.exists(ground_truth), "ground_truth"
-    tmp_tr = f"/tmp/train_dataset_{time()}.txt"
+
     with open(ground_truth, "r") as annotations:
-        train = open(tmp_tr, 'w')
         lines = list(annotations)
         random.shuffle(lines)
+
+    prefix = 'c3d-_output-' if 'c3d' in directory else 'p3d-_output-'
+    suffixes = []
+
+    if not no_nfps:
+        suffixes.append('.npy')
+    if not no_flip and not no_nfps:
+        suffixes.append('.flip.npy')
+    if not no_lfps:
+        suffixes.append('.lfps.npy')
+    if not no_lfps and not no_flip:
+        suffixes.append('.flip.lfps.npy')
+
+    tmp_tr = f"/tmp/lr_find_dataset_{time()}.txt"
+    tmp_pl = f"/tmp/lr_find_plot_{time()}.pdf"
+
+    with open(tmp_tr, 'w') as train:
         for i, line in enumerate(lines):
             name, mark = line.strip().split(',')
-            print('c3d-_output-' + '-'.join(name.split('-')[1:]), mark, sep=',', file=train)
-        train.close()
-    ex.add_artifact(tmp_tr, "train.txt")
+            print(prefix + '-'.join(name.split('-')[1:]), mark, sep=',', file=train)
 
-    suffixes = [
-        ".npy",
-        ".mirror.npy",
-        ".lfps.npy",
-        ".mirror.lfps.npy",
-    ]
+    ex.add_artifact(tmp_tr, f"dataset.txt")
 
     trainset = videoDataset(root=directory,
                             label=tmp_tr, suffixes=suffixes, transform=transform, data=None)
 
-    save_file = f'/tmp/plot{time()}.pdf'
-
-    trainLoader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=0)
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=0)
 
     # build the model
-    scoring = get_scoring_model(model)
+    scoring = get_scoring_model(model, featn=featn)
     if torch.cuda.is_available():
         scoring.cuda()
 
-    total_params = sum(p.numel() for p in scoring.parameters() if p.requires_grad)
-    print("Total Params: " + str(total_params))
     optimizer = optim.Adam(params=scoring.parameters())  # use SGD optimizer to optimize the loss function
 
     class PLoss(torch.nn.Module):
@@ -67,9 +76,13 @@ def main(model, directory, ground_truth, seed):
                 return scoring.loss(logits, target) + penal
 
     lr_finder = LRFinder(scoring, optimizer, PLoss(), device="cuda")
-    lr_finder.range_test(trainLoader, end_lr=100, num_iter=100)
-    lr_finder.plot().savefig(save_file)
+    lr_finder.range_test(train_loader, end_lr=100, num_iter=100)
 
-    ex.add_artifact(save_file, "plot.pdf")
+    lrs = lr_finder.history["lr"]
+    losses = lr_finder.history["loss"]
 
-    os.remove(save_file)
+    print('Min found in', lrs[np.argmin(losses)])
+
+    lr_finder.plot().savefig(tmp_pl)
+
+    ex.add_artifact(tmp_pl, "plot.pdf")

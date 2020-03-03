@@ -5,6 +5,7 @@ import numpy as np
 import os
 import pandas as pd
 import random
+import shutil
 import torch
 import torch.optim as optim
 import torch.utils.data as data
@@ -17,19 +18,25 @@ from src.exp.base_experiment import get_skira_exp
 from src.util.lr_finder import LRFinder
 from src.util.one_cycle import OneCycleLR
 
-ex = get_skira_exp("2_find_lr_and_cross_val")
+ex = get_skira_exp("3_find_lr_and_cross_val")
+
+
+def rm_r(path):
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path)
+    elif os.path.exists(path):
+        os.remove(path)
 
 
 @ex.config
 def config_1():
-    ground_truth = "data/selected/gt.txt"
-    max_epochs = 70
+    max_epochs = 60
     model = 'scoring'
     no_nfps = False
     no_lfps = False
     no_flip = False
     featn = 4096
-    k_cross_val = 10
+    k_cross_val = 5
 
 
 def train_shuffle(model, trainset, testset, models_dir, epochs, lr_peak, time_n, features):
@@ -99,7 +106,7 @@ def train_shuffle(model, trainset, testset, models_dir, epochs, lr_peak, time_n,
         val_sr, _ = sr(val_truth, val_pred)
         val_mse = val_loss / val_sample
 
-        if val_mse < min_mse <= 1.5 or 0.7 <= max_spea < val_sr:
+        if True or val_mse < min_mse <= 1.5 or 0.7 <= max_spea < val_sr:
             torch.save(scoring.state_dict(), os.path.join(models_dir, f'time-{time_n}-epoch-{epoch}.pt'))
 
             with open(os.path.join(models_dir, f'time-{time_n}-epoch-{epoch}.csv'), 'w') as f:
@@ -112,7 +119,7 @@ def train_shuffle(model, trainset, testset, models_dir, epochs, lr_peak, time_n,
             plt.savefig(os.path.join(models_dir, f'time-{time_n}-epoch-{epoch}_plot.pdf'))
             plt.close()
 
-            gb = pd.DataFrame(np.array([val_truth, val_pred]).T).groupby(0)
+            gb = pd.DataFrame(np.array([val_truth.flatten(), val_pred.flatten()]).T).groupby(0)
             gb = np.array([[i[0], list(i[1][1])] for i in gb])
             labels = gb[:, 0]
             gb = gb[:, 1]
@@ -137,6 +144,9 @@ def train_shuffle(model, trainset, testset, models_dir, epochs, lr_peak, time_n,
 
 @ex.automain
 def main(directory, ground_truth, model, seed, max_epochs, no_nfps, k_cross_val, featn, no_lfps, no_flip):
+    tmp_dir = "/tmp/skira"
+    rm_r(tmp_dir)
+    os.mkdir(tmp_dir)
     random.seed(seed)
     assert os.path.exists(ground_truth), "ground_truth"
 
@@ -156,8 +166,8 @@ def main(directory, ground_truth, model, seed, max_epochs, no_nfps, k_cross_val,
     if not no_lfps and not no_flip:
         suffixes.append('.flip.lfps.npy')
 
-    tmp_tr = f"/tmp/lr_find_dataset_{time()}.txt"
-    tmp_pl = f"/tmp/lr_find_plot_{time()}.pdf"
+    tmp_tr = f"{tmp_dir}/lr_find_dataset_{time()}.txt"
+    tmp_pl = f"{tmp_dir}/lr_find_plot_{time()}.pdf"
 
     with open(tmp_tr, 'w') as train:
         for i, line in enumerate(lines):
@@ -198,25 +208,23 @@ def main(directory, ground_truth, model, seed, max_epochs, no_nfps, k_cross_val,
 
     lr_finder.plot().savefig(tmp_pl)
 
-    ex.add_artifact(tmp_pl, "plot.pdf")
+    ex.add_artifact(tmp_pl, "lr_find_plot.pdf")
 
     # actual training
-
-    random.seed(seed)
 
     lines = []
     with open(ground_truth, "r") as f:
         lines.extend(f)
     random.shuffle(lines)
 
-    tmp_dir = f"/tmp/models_{time()}"
+    tmp_dir = f"{tmp_dir}/models_{time()}"
     os.mkdir(tmp_dir)
 
     s_mse = 0
     s_corr = 0
     for time_n in range(k_cross_val):
-        tmp_tr = f"/tmp/train_dataset_{time()}.txt"
-        tmp_te = f"/tmp/test_dataset_{time()}.txt"
+        tmp_tr = f"{tmp_dir}/train_dataset_{time()}.txt"
+        tmp_te = f"{tmp_dir}/validation_dataset_{time()}.txt"
         train = open(tmp_tr, 'w')
         validation = open(tmp_te, 'w')
         for i, line in enumerate(lines):

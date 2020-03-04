@@ -18,7 +18,7 @@ from src.exp.base_experiment import get_skira_exp
 from src.util.lr_finder import LRFinder
 from src.util.one_cycle import OneCycleLR
 
-ex = get_skira_exp("3_find_lr_and_cross_val")
+ex = get_skira_exp("4_find_lr_and_cross_val")
 
 
 def rm_r(path):
@@ -37,10 +37,15 @@ def config_1():
     no_flip = False
     featn = 4096
     k_cross_val = 5
+    ground_truth = None
+    train_set = None
+    test_set = None
+    seed = 29736184
 
 
-def train_shuffle(model, trainset, testset, models_dir, epochs, lr_peak, time_n, features):
+def run(model, trainset, testset, models_dir, epochs, lr_peak, time_n, features):
     max_spea = 0
+    min_mae = 1000
     min_mse = 1000
 
     trainLoader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=0)
@@ -86,6 +91,8 @@ def train_shuffle(model, trainset, testset, models_dir, epochs, lr_peak, time_n,
         training_mse = total_scoring_mse / total_sample
         print("Regression Loss: " + str(training_loss))
         print("Training MSE: " + str(training_mse))
+
+        # validation
         scoring.eval()
         val_sample = 0
         val_loss = 0
@@ -104,6 +111,7 @@ def train_shuffle(model, trainset, testset, models_dir, epochs, lr_peak, time_n,
         val_truth = np.concatenate(val_truth)
         val_pred = np.concatenate(val_pred)
         val_sr, _ = sr(val_truth, val_pred)
+        val_mae = np.mean(np.abs(val_truth - val_pred))
         val_mse = val_loss / val_sample
 
         if True or val_mse < min_mse <= 1.5 or 0.7 <= max_spea < val_sr:
@@ -111,13 +119,13 @@ def train_shuffle(model, trainset, testset, models_dir, epochs, lr_peak, time_n,
 
             with open(os.path.join(models_dir, f'time-{time_n}-epoch-{epoch}.csv'), 'w') as f:
                 for i in range(val_truth.shape[0]):
-                    print(str(val_truth[i]), str(val_pred[i]), sep=',', file=f)
+                    print(val_truth[i][0], val_pred[i][0], sep=',', file=f)
 
             plt.scatter(val_truth, val_pred)
             plt.xlabel("Truth")
             plt.ylabel("Predicted")
             plt.savefig(os.path.join(models_dir, f'time-{time_n}-epoch-{epoch}_plot.pdf'))
-            plt.close()
+            plt.clf()
 
             gb = pd.DataFrame(np.array([val_truth.flatten(), val_pred.flatten()]).T).groupby(0)
             gb = np.array([[i[0], list(i[1][1])] for i in gb])
@@ -129,6 +137,7 @@ def train_shuffle(model, trainset, testset, models_dir, epochs, lr_peak, time_n,
             plt.ylabel("Predicted")
             plt.savefig(os.path.join(models_dir, f'time-{time_n}-epoch-{epoch}_boxplot.pdf'))
 
+        min_mae = min(min_mae, val_mae)
         min_mse = min(min_mse, val_mse)
         max_spea = max(max_spea, val_sr)
 
@@ -139,18 +148,27 @@ def train_shuffle(model, trainset, testset, models_dir, epochs, lr_peak, time_n,
             print('Early stopping')
             break
 
-    return min_mse, max_spea
+    return min_mae, min_mse, max_spea
 
 
 @ex.automain
-def main(directory, ground_truth, model, seed, max_epochs, no_nfps, k_cross_val, featn, no_lfps, no_flip):
+def main(directory, ground_truth, train_set, test_set, model, seed, max_epochs, no_nfps, k_cross_val, featn, no_lfps, no_flip):
     tmp_dir = "/tmp/skira"
     rm_r(tmp_dir)
     os.mkdir(tmp_dir)
     random.seed(seed)
-    assert os.path.exists(ground_truth), "ground_truth"
 
-    with open(ground_truth, "r") as annotations:
+    is_cv = k_cross_val > 1
+
+    if is_cv:
+        assert train_set is None and test_set is None, "Either ground_truth for CV or train_set and test_set for test"
+        assert os.path.exists(ground_truth), "ground_truth"
+    else:
+        assert ground_truth is None, "Either ground_truth for CV or train_set and test_set for test"
+        assert os.path.exists(train_set), "ground_truth"
+        assert os.path.exists(test_set), "ground_truth"
+
+    with open(train_set, "r") as annotations:
         lines = list(annotations)
         random.shuffle(lines)
 
@@ -213,7 +231,7 @@ def main(directory, ground_truth, model, seed, max_epochs, no_nfps, k_cross_val,
     # actual training
 
     lines = []
-    with open(ground_truth, "r") as f:
+    with open(train_set, "r") as f:
         lines.extend(f)
     random.shuffle(lines)
 
@@ -223,26 +241,31 @@ def main(directory, ground_truth, model, seed, max_epochs, no_nfps, k_cross_val,
     s_mse = 0
     s_corr = 0
     for time_n in range(k_cross_val):
-        tmp_tr = f"{tmp_dir}/train_dataset_{time()}.txt"
-        tmp_te = f"{tmp_dir}/validation_dataset_{time()}.txt"
-        train = open(tmp_tr, 'w')
-        validation = open(tmp_te, 'w')
-        for i, line in enumerate(lines):
-            name, mark = line.strip().split(',')
-            print(prefix + '-'.join(name.split('-')[1:]), mark,
-                  sep=',',
-                  file=validation if i % k_cross_val == time_n else train)
-        train.close()
-        validation.close()
+        if is_cv:  # this is cross-val
+            tmp_tr = f"{tmp_dir}/train_dataset_{time()}.txt"
+            tmp_te = f"{tmp_dir}/validation_dataset_{time()}.txt"
+            train = open(tmp_tr, 'w')
+            validation = open(tmp_te, 'w')
+            for i, line in enumerate(lines):
+                name, mark = line.strip().split(',')
+                print(prefix + '-'.join(name.split('-')[1:]), mark,
+                      sep=',',
+                      file=validation if i % k_cross_val == time_n else train)
+            train.close()
+            validation.close()
 
-        ex.add_artifact(tmp_tr, f"{time_n}-train.txt")
-        ex.add_artifact(tmp_te, f"{time_n}-validation.txt")
+            ex.add_artifact(tmp_tr, f"{time_n}-train.txt")
+            ex.add_artifact(tmp_te, f"{time_n}-validation.txt")
+        else:  # this is test
+            tmp_tr = train_set
+            tmp_te = test_set
 
         trainset = videoDataset(root=directory, label=tmp_tr, suffixes=suffixes, transform=transform, data=None)
         valset = videoDataset(root=directory, label=tmp_te, suffixes=suffixes[0], transform=transform, data=None)
 
-        min_mse, max_corr = train_shuffle(model, trainset, valset, tmp_dir, max_epochs, lr_argmin, time_n, featn)
+        min_mse, min_mae, max_corr = run(model, trainset, valset, tmp_dir, max_epochs, lr_argmin, time_n, featn)
 
+        print('MinValMAE', min_mae)
         print('MinValMSE', min_mse)
         print('MaxSpearmanCorr', max_corr)
         s_mse += min_mse

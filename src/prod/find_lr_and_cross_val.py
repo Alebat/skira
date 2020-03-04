@@ -162,7 +162,8 @@ def main(directory, ground_truth, train_set, test_set, model, seed, max_epochs, 
 
     if is_cv:
         assert train_set is None and test_set is None, "Either ground_truth for CV or train_set and test_set for test"
-        assert os.path.exists(ground_truth), "ground_truth"
+        train_set = ground_truth
+        assert os.path.exists(train_set), "ground_truth"
     else:
         assert ground_truth is None, "Either ground_truth for CV or train_set and test_set for test"
         assert os.path.exists(train_set), "ground_truth"

@@ -236,44 +236,61 @@ def main(directory, ground_truth, train_set, test_set, model, seed, max_epochs, 
         lines.extend(f)
     random.shuffle(lines)
 
-    tmp_dir = f"{tmp_dir}/models_{time()}"
-    os.mkdir(tmp_dir)
+    tmp_dir_m = f"{tmp_dir}/models_{time()}"
+    os.mkdir(tmp_dir_m)
 
     s_mse = 0
+    s_mae = 0
     s_corr = 0
     for time_n in range(k_cross_val):
+        tmp_tr = f"{tmp_dir}/train_dataset_{time()}.txt"
+        tmp_te = f"{tmp_dir}/validation_dataset_{time()}.txt"
+        train = open(tmp_tr, 'w')
+        validation = open(tmp_te, 'w')
         if is_cv:  # this is cross-val
-            tmp_tr = f"{tmp_dir}/train_dataset_{time()}.txt"
-            tmp_te = f"{tmp_dir}/validation_dataset_{time()}.txt"
-            train = open(tmp_tr, 'w')
-            validation = open(tmp_te, 'w')
             for i, line in enumerate(lines):
                 name, mark = line.strip().split(',')
                 print(prefix + '-'.join(name.split('-')[1:]), mark,
                       sep=',',
                       file=validation if i % k_cross_val == time_n else train)
-            train.close()
-            validation.close()
-
-            ex.add_artifact(tmp_tr, f"{time_n}-train.txt")
-            ex.add_artifact(tmp_te, f"{time_n}-validation.txt")
         else:  # this is test
-            tmp_tr = train_set
-            tmp_te = test_set
+            for i, line in enumerate(lines):
+                name, mark = line.strip().split(',')
+                print(prefix + '-'.join(name.split('-')[1:]), mark,
+                      sep=',',
+                      file=train)
+
+            lines = []
+            with open(test_set, "r") as f:
+                lines.extend(f)
+            random.shuffle(lines)
+
+            for i, line in enumerate(lines):
+                name, mark = line.strip().split(',')
+                print(prefix + '-'.join(name.split('-')[1:]), mark,
+                      sep=',',
+                      file=validation)
+        train.close()
+        validation.close()
+
+        ex.add_artifact(tmp_tr, f"{time_n}-train.txt")
+        ex.add_artifact(tmp_te, f"{time_n}-validation.txt")
 
         trainset = videoDataset(root=directory, label=tmp_tr, suffixes=suffixes, transform=transform, data=None)
         valset = videoDataset(root=directory, label=tmp_te, suffixes=suffixes[0], transform=transform, data=None)
 
-        min_mse, min_mae, max_corr = run(model, trainset, valset, tmp_dir, max_epochs, lr_argmin, time_n, featn)
+        min_mse, min_mae, max_corr = run(model, trainset, valset, tmp_dir_m, max_epochs, lr_argmin, time_n, featn)
 
         print('MinValMAE', min_mae)
         print('MinValMSE', min_mse)
         print('MaxSpearmanCorr', max_corr)
         s_mse += min_mse
+        s_mae += min_mae
         s_corr += max_corr
 
     print('AvgValMSE', s_mse / k_cross_val)
+    print('AvgValMAE', s_mae / k_cross_val)
     print('AvgSpearmanCorr', s_corr / k_cross_val)
 
-    for f in os.listdir(tmp_dir):
-        ex.add_artifact(os.path.join(tmp_dir, f))
+    for f in os.listdir(tmp_dir_m):
+        ex.add_artifact(os.path.join(tmp_dir_m, f))

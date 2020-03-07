@@ -44,18 +44,24 @@ def multisave(name, extension, images, fps):
         out[o].release()
 
 
-def draw_bb(tracks, images, rel=True):
+def draw_bb(tracks, images, rel=True, frame_n=None):
+    all = frame_n is not None
     for f, i in images:
-        if f in tracks.index:
-            dets = tracks.loc[f]
-            for _, row in (dets.iterrows() if len(dets.shape) == 2 else [(0, dets)]):
-                n, x, y, xx, yy, _, _, _, _ = row
+        if all or f in tracks.index:
+            dets = tracks.loc[f] if not all else tracks
+            for n, row in (dets.iterrows() if len(dets.shape) == 2 else [(0, dets)]):
+                if all:
+                    if n[0] > frame_n:
+                        continue
+                    n = n[1]
+                x, y, xx, yy, _, _, _, _ = row
                 if rel:
                     xx = x + xx
                     yy = y + yy
-                cv2.rectangle(i, (int(x), int(y)), (int(xx), int(yy)), hsv2rgb(n * 49 % 15 / 15, 1, 1), 2)
-                cv2.putText(i, str(int(n)), (int(x), int(y) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                            color=hsv2rgb(n * 49 % 15 / 15, 1, 1))
+                cv2.rectangle(i, (int(x), int(y)), (int(xx), int(yy)), hsv2rgb(n * 49 % 15 / 15, 1, 1), 1)
+                if not all:
+                    cv2.putText(i, str(int(n)), (int(x), int(y) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                color=hsv2rgb(n * 49 % 15 / 15, 1, 1))
         yield i
 
 
@@ -147,6 +153,28 @@ def highlight(input_video, input_detections, output_video, relative_bboxes=True,
     save(output_video,
          tqdm(draw_bb(input_detections, read_images(vc, rotate90), rel=relative_bboxes), total=vc.get(7), unit='frame'),
          vc.get(5))
+    vc.release()
+
+
+def nth_image(n, x):
+    last = None
+    for i, img in x:
+        last = img
+        if i == n:
+            break
+    return last
+
+
+def highlight_img(input_video, input_detections, output, frame_n, relative_bboxes=True, rotate90=False):
+    if isinstance(input_detections, str):
+        input_detections = pd.read_csv(input_detections,
+                                       sep=',',
+                                       header=None,
+                                       index_col=0,
+                                       names=['frame', 'id', 'bb_left', 'bb_top', 'bb_width', 'bb_height', 'conf', 'x',
+                                              'y', 'z'])
+    vc = cv2.VideoCapture(input_video)
+    cv2.imwrite(output, list(draw_bb(input_detections, [(0, nth_image(frame_n, read_images(vc, rotate90)))], rel=relative_bboxes, frame_n=frame_n))[0])
     vc.release()
 
 

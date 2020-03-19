@@ -60,8 +60,8 @@ def draw_bb(tracks, images, rel=True, frame_n=None):
                     yy = y + yy
                 cv2.rectangle(i, (int(x), int(y)), (int(xx), int(yy)), hsv2rgb(n * 49 % 15 / 15, 1, 1), 1)
                 if not all:
-                    cv2.putText(i, str(int(n)), (int(x), int(y) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                color=hsv2rgb(n * 49 % 15 / 15, 1, 1))
+                    cv2.putText(i, str(int(n)), (int(x), int(y) - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                                color=hsv2rgb(n * 49 % 15 / 15, 1, 0))
         yield i
 
 

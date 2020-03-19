@@ -30,7 +30,7 @@ def rm_r(path):
 
 @ex.config
 def config_1():
-    max_epochs = 60
+    max_epochs = 65
     model = 'scoring'
     no_nfps = False
     no_lfps = False
@@ -43,7 +43,7 @@ def config_1():
     seed = 29736184
 
 
-def run(model, trainset, testset, models_dir, epochs, lr_peak, time_n, features):
+def run(model, trainset, testset, models_dir, epochs, lr_peak, time_n, features, **kwargs):
     max_spea = 0
     min_mae = 1000
     min_mse = 1000
@@ -51,7 +51,7 @@ def run(model, trainset, testset, models_dir, epochs, lr_peak, time_n, features)
     trainLoader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=0)
     valLoader = torch.utils.data.DataLoader(testset, batch_size=64, shuffle=False, num_workers=0)
     # build the model
-    scoring = get_scoring_model(model, features)
+    scoring = get_scoring_model(model, features, **kwargs)
     if torch.cuda.is_available():
         scoring.cuda()
 
@@ -152,7 +152,7 @@ def run(model, trainset, testset, models_dir, epochs, lr_peak, time_n, features)
 
 
 @ex.automain
-def main(directory, ground_truth, train_set, test_set, model, seed, max_epochs, no_nfps, k_cross_val, featn, no_lfps, no_flip):
+def main(directory, ground_truth, train_set, test_set, model, seed, max_epochs, no_nfps, k_cross_val, featn, no_lfps, no_flip, dropout_p, rec_model, tilde_m, tilde_d, h_s, h_l, d_1, d_2):
     tmp_dir = "/tmp/skira"
     rm_r(tmp_dir)
     os.mkdir(tmp_dir)
@@ -279,7 +279,13 @@ def main(directory, ground_truth, train_set, test_set, model, seed, max_epochs, 
         trainset = videoDataset(root=directory, label=tmp_tr, suffixes=suffixes, transform=transform, data=None)
         valset = videoDataset(root=directory, label=tmp_te, suffixes=suffixes[0], transform=transform, data=None)
 
-        min_mse, min_mae, max_corr = run(model, trainset, valset, tmp_dir_m, max_epochs, lr_argmin, time_n, featn)
+        min_mse, min_mae, max_corr = run(model, trainset, valset, tmp_dir_m, max_epochs, lr_argmin, time_n, featn,
+                                         dropout_p=dropout_p,
+                                         rec_model=rec_model,
+                                         tilde_m=tilde_m,
+                                         tilde_d=tilde_d,
+                                         h_s=h_s,
+                                         h_l=h_l, d_1=d_1, d_2=d_2)
 
         print('MinValMAE', min_mae)
         print('MinValMSE', min_mse)
